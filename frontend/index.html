@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Glacier Explorer</title>
+
+    <!-- Leaflet CSS -->
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="sidebar">
+
+        <h1>Glacier Explorer</h1>
+
+        <p>Rob Roy Glacier, New Zealand</p>
+
+        <label for="year">Select year</label>
+
+        <select id="year">
+            <option value="2017">2017</option>
+            <option value="2018">2018</option>
+            <option value="2019" selected>2019</option>
+            <option value="2020">2020</option>
+            <option value="2021">2021</option>
+            <option value="2022">2022</option>
+            <option value="2023">2023</option>
+            <option value="2024">2024</option>
+        </select>
+
+        <button id="viewYear">
+            View Year
+        </button>
+
+        <hr>
+
+        <h3>Detected glacier-like area</h3>
+
+        <div id="area">
+            Select a year
+        </div>
+
+        <p>
+            Reference year: <strong>2017</strong>
+        </p>
+
+        <p>
+            Similarity threshold: 0.80
+        </p>
+
+    </div>
+
+    <div id="map"></div>
+
+
+    <!-- Leaflet -->
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+    </script>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
