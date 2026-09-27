@@ -112,5 +112,3 @@
 ## Handover
 
 The completed tests cover normal loading, backend connection failure, recovery after restart, a simulated Earth Engine exception and simulated zero detections.
-
-T
