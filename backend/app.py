@@ -1,7 +1,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from glacier_analysis import calculate_glacier
+from marmolada_analysis import calculate_glacier
 
 app = Flask(__name__)
 CORS(app)
