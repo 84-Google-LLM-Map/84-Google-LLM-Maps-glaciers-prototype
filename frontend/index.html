@@ -10,98 +10,9 @@
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   >
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      height: 100vh;
-    }
-
-    aside {
-      width: 310px;
-      flex-shrink: 0;
-      padding: 24px;
-      overflow-y: auto;
-      background: white;
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    label {
-      display: block;
-      margin-top: 18px;
-    }
-
-    select,
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 8px;
-      font: inherit;
-    }
-
-    button {
-      cursor: pointer;
-    }
-
-    button:disabled {
-      cursor: wait;
-    }
-
-    #map {
-      flex: 1;
-      min-width: 0;
-    }
-
-    #area {
-      font-size: 28px;
-      font-weight: bold;
-    }
-
-    #status {
-      line-height: 1.5;
-      overflow-wrap: anywhere;
-    }
-
-    .error {
-      color: #b42318;
-    }
-
-    #warning {
-      padding: 12px;
-      background: #fff4ce;
-      border-left: 4px solid #b58100;
-      line-height: 1.5;
-    }
-
-    .note {
-      font-size: 13px;
-      line-height: 1.5;
-      color: #555;
-    }
-
-    @media (max-width: 650px) {
-      body {
-        flex-direction: column;
-      }
-
-      aside {
-        width: 100%;
-        max-height: 50vh;
-      }
-
-      #map {
-        min-height: 50vh;
-      }
-    }
-  </style>
+    <!-- Our styling -->
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
 </head>
 
 <body>
@@ -114,29 +25,128 @@
       <option value="marmolada">Marmolada — Italy</option>
     </select>
 
-    <label for="year">Select year</label>
-    <select id="year"></select>
+    <!-- Timeline -->
+    <div class="timeline-section">
 
-    <button id="view" type="button">View Year</button>
+        <div class="timeline-header">
+            <div>
+                <strong>Explore Timeline</strong>
+            </div>
+
+            <span id="sliderYear">2019</span>
+        </div>
+
+        <input
+            type="range"
+            id="yearSlider"
+            min="2017"
+            max="2024"
+            step="1"
+            value="2019"
+        >
+
+        <div class="timeline-years">
+            <span>2017</span>
+            <span>2024</span>
+        </div>
+
+    </div>
+
+
+    <!-- Compare Years -->
+    <div class="comparison-section">
+
+        <h3 class="comparison-title">Select Year</h3>
+
+        <p class="comparison-description">
+            Choose a year to visualise glacier-like area.
+        </p>
+
+        <label for="year">Year</label>
+        <select id="year"></select>
+
+        <button id="view" type="button">
+            View Year
+        </button>
+
+    </div>
+
+
+    <!-- Optional Second Year -->
+    <div class="second-year-section">
+
+        <div class="section-heading">
+            <h3>Second Year <span>(Optional)</span></h3>
+
+            <p>
+                Select a second year if you want to view another year's glacier-like area.
+            </p>
+        </div>
+
+        <label for="secondYear">Second Year</label>
+        <select id="secondYear"></select>
+
+        <button id="viewSecondYear" type="button">
+            View Second Year
+        </button>
+
+    </div>
 
     <p id="status" role="status" aria-live="polite">
       Select a year and click View Year.
     </p>
 
-    <hr>
+    <div id="resultsSection" class="results-section" hidden>
 
-    <h3>Detected glacier-like area</h3>
-    <p id="area">—</p>
+        <h3>Glacier Analysis</h3>
 
-    <p>
-      Reference year:
-      <strong id="reference">—</strong>
-    </p>
+        <div class="comparison-results">
 
-    <p>
-      Similarity threshold:
-      <span id="threshold">—</span>
-    </p>
+            <!-- First Year -->
+            <div class="result-card" id="firstResultCard">
+
+                <span class="result-label">First Year</span>
+
+                <h3 id="firstResultYear">—</h3>
+
+                <p class="result-area" id="firstArea">—</p>
+
+                <p>
+                    Reference year:
+                    <strong id="firstReference">—</strong>
+                </p>
+
+                <p>
+                    Similarity threshold:
+                    <span id="firstThreshold">—</span>
+                </p>
+
+            </div>
+
+
+            <!-- Second Year -->
+            <div class="result-card" id="secondResultCard" hidden>
+
+                <span class="result-label">Second Year</span>
+
+                <h3 id="secondResultYear">—</h3>
+
+                <p class="result-area" id="secondArea">—</p>
+
+                <p>
+                    Reference year:
+                    <strong id="secondReference">—</strong>
+                </p>
+
+                <p>
+                    Similarity threshold:
+                    <span id="secondThreshold">—</span>
+                </p>
+
+            </div>
+
+        </div>
+    </div>
 
     <p id="warning" hidden></p>
 
@@ -147,212 +157,21 @@
     </p>
   </aside>
 
-  <div id="map" aria-label="Glacier map"></div>
+  <div id="map-container">
+
+    <div id="first-map-container">
+        <div id="first-map-label">2019</div>
+        <div id="map" aria-label="Glacier map"></div>
+    </div>
+
+    <div id="second-map-container" hidden>
+        <div id="second-map-label">Second Year</div>
+        <div id="secondMap"></div>
+    </div>
+
+</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <script>
-    const API = "http://127.0.0.1:5000";
-
-    // Leaflet coordinates: latitude, longitude.
-    const glaciers = {
-      "rob-roy": {
-        name: "Rob Roy",
-        centre: [-44.455, 168.741],
-        zoom: 13
-      },
-      "marmolada": {
-        name: "Marmolada",
-        centre: [46.43522, 11.857975],
-        zoom: 13
-      }
-    };
-
-    const glacierSelect = document.getElementById("glacier");
-    const yearSelect = document.getElementById("year");
-    const viewButton = document.getElementById("view");
-    const status = document.getElementById("status");
-    const area = document.getElementById("area");
-    const reference = document.getElementById("reference");
-    const threshold = document.getElementById("threshold");
-    const warning = document.getElementById("warning");
-
-    for (let year = 2017; year <= 2024; year++) {
-      yearSelect.add(new Option(year, year));
-    }
-
-    yearSelect.value = "2019";
-
-    const map = L.map("map").setView(
-      glaciers["rob-roy"].centre,
-      glaciers["rob-roy"].zoom
-    );
-
-    const satellite = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/" +
-      "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        attribution: "Tiles &copy; Esri",
-        maxZoom: 19
-      }
-    ).addTo(map);
-
-    const streets = L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 19
-      }
-    );
-
-    L.control.layers({
-      Satellite: satellite,
-      Streets: streets
-    }).addTo(map);
-
-    let overlay = null;
-
-    function clearResult() {
-      if (overlay) {
-        map.removeLayer(overlay);
-        overlay = null;
-      }
-
-      area.textContent = "—";
-      reference.textContent = "—";
-      threshold.textContent = "—";
-      warning.hidden = true;
-      warning.textContent = "";
-      status.className = "";
-    }
-
-    function showDemoWarning() {
-      if (glacierSelect.value === "marmolada") {
-        warning.textContent =
-          "Demo only: Marmolada currently uses an artificial, " +
-          "unverified reference polygon. Results require Applied " +
-          "Science review and are not validated glacier measurements.";
-
-        warning.hidden = false;
-      }
-    }
-
-    function setBusy(busy) {
-      viewButton.disabled = busy;
-      glacierSelect.disabled = busy;
-      yearSelect.disabled = busy;
-      viewButton.textContent = busy ? "Analysing…" : "View Year";
-    }
-
-    async function loadGlacier() {
-      const glacierId = glacierSelect.value;
-      const year = yearSelect.value;
-      const selected = glaciers[glacierId];
-
-      clearResult();
-      showDemoWarning();
-      setBusy(true);
-
-      map.setView(selected.centre, selected.zoom);
-      status.textContent =
-        `Analysing ${selected.name} for ${year}…`;
-
-      try {
-        const response = await fetch(
-          `${API}/api/glacier/${year}?glacier=${glacierId}`
-        );
-
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          throw new Error(
-            data.error || `Request failed: ${response.status}`
-          );
-        }
-
-        // Detect an old backend that ignores glacier selection.
-        if (data.glacierId !== glacierId) {
-          throw new Error(
-            "The backend returned the wrong glacier or is running " +
-            "the old app.py. Restart the updated backend."
-          );
-        }
-
-        if (
-          !Number.isFinite(data.area) ||
-          data.area < 0 ||
-          typeof data.tileUrl !== "string"
-        ) {
-          throw new Error(
-            "The backend returned incomplete analysis data."
-          );
-        }
-
-        area.textContent = `${data.area.toFixed(2)} km\u00B2`;
-        reference.textContent = data.referenceYear;
-        threshold.textContent = Number(data.threshold).toFixed(2);
-
-        if (data.warning) {
-          warning.textContent = data.warning;
-          warning.hidden = false;
-        }
-
-        const newOverlay = L.tileLayer(data.tileUrl, {
-          opacity: 0.75,
-          maxZoom: 19
-        });
-
-        overlay = newOverlay;
-        let tileFailed = false;
-
-        newOverlay.on("tileerror", () => {
-          if (overlay !== newOverlay) return;
-
-          tileFailed = true;
-          status.className = "error";
-          status.textContent =
-            "Analysis returned data, but some overlay tiles failed " +
-            "to load. Click View Year to retry.";
-        });
-
-        newOverlay.on("load", () => {
-          if (overlay !== newOverlay || tileFailed) return;
-
-          status.textContent =
-            `${selected.name}, ${year}: ` +
-            (data.area === 0
-              ? "No matching pixels detected."
-              : "Analysis and overlay loaded.");
-        });
-
-        status.textContent =
-          `${selected.name}, ${year}: analysis returned. ` +
-          "Loading overlay…";
-
-        newOverlay.addTo(map);
-
-      } catch (error) {
-        console.error(error);
-        status.className = "error";
-        status.textContent =
-          `Could not load glacier data: ${error.message}`;
-
-      } finally {
-        setBusy(false);
-      }
-    }
-
-    viewButton.addEventListener("click", loadGlacier);
-
-    // Changing glacier automatically runs the selected year.
-    glacierSelect.addEventListener("change", loadGlacier);
-
-    yearSelect.addEventListener("change", () => {
-      clearResult();
-      showDemoWarning();
-      status.textContent =
-        "Click View Year to analyse the selected year.";
-    });
-  </script>
+    
 </body>
 </html>
