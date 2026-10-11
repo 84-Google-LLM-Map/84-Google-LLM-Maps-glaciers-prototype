@@ -69,6 +69,22 @@ def get_embedding(year):
         .clip(STUDY_AREA)
     )
 
+# ---------------------------------------------------------
+# GET EMBEDDING FOR A DYNAMIC STUDY AREA
+# ---------------------------------------------------------
+
+def get_dynamic_embedding(year, study_area):
+    start = ee.Date.fromYMD(year, 1, 1)
+    end = start.advance(1, "year")
+
+    return (
+        EMBEDDINGS
+        .filterDate(start, end)
+        .filterBounds(study_area)
+        .mosaic()
+        .select(BANDS)
+        .clip(study_area)
+    )
 
 # ---------------------------------------------------------
 # CREATE FIXED 2017 GLACIER REFERENCE
@@ -171,6 +187,86 @@ def calculate_glacier(year):
         "min": 1,
         "max": 1,
         "palette": ["00FFFF"]
+    })
+
+    return {
+        "year": year,
+        "referenceYear": REFERENCE_YEAR,
+        "threshold": SIMILARITY_THRESHOLD,
+        "area": area.getInfo(),
+        "tileUrl": map_info["tile_fetcher"].url_format
+    }
+
+# ---------------------------------------------------------
+# RUN DYNAMIC GLACIER ANALYSIS
+# ---------------------------------------------------------
+
+def calculate_dynamic_glacier(year, study_area):
+
+    # Keep the existing manually selected
+    # Rob Roy 2017 glacier reference
+    reference = create_reference()
+
+    # Use the user's drawn polygon as the study area
+    embedding = get_dynamic_embedding(
+        year,
+        study_area
+    )
+
+    # Similarity with fixed 2017 glacier reference
+    similarity = (
+        embedding
+        .multiply(reference)
+        .reduce(ee.Reducer.sum())
+        .rename("glacier_similarity")
+    )
+
+    # >= 0.80 = glacier-like
+    glacier_mask = similarity.gte(
+        SIMILARITY_THRESHOLD
+    )
+
+    glacier_like = (
+        glacier_mask
+        .selfMask()
+        .rename("glacier_like")
+    )
+
+    # -----------------------------------------------------
+    # CALCULATE AREA
+    # -----------------------------------------------------
+
+    area_image = (
+        ee.Image.pixelArea()
+        .divide(1e6)
+        .rename("area")
+        .updateMask(glacier_mask)
+    )
+
+    area_result = area_image.reduceRegion(
+        reducer=ee.Reducer.sum(),
+        geometry=study_area,
+        scale=SCALE,
+        maxPixels=1e9,
+        tileScale=4
+    )
+
+    area = ee.Number(
+        ee.Algorithms.If(
+            area_result.contains("area"),
+            area_result.get("area"),
+            0
+        )
+    )
+
+    # -----------------------------------------------------
+    # CREATE MAP TILE
+    # -----------------------------------------------------
+
+    map_info = glacier_like.getMapId({
+        "min": 1,
+        "max": 1,
+        "palette": ["FF00FF"]
     })
 
     return {

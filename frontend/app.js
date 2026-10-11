@@ -518,3 +518,60 @@ map.on("move", () => {
 
 // Load initial year
 loadYear(yearSelect.value, false);
+
+// Adding Geoman controls to the map
+map.pm.addControls({
+    position: "topleft",
+
+    drawMarker: false,
+    drawCircleMarker: false,
+    drawPolyline: false,
+    drawCircle: false,
+
+    drawRectangle: true,
+    drawPolygon: true,
+
+    editMode: true,
+    dragMode: false,
+    cutPolygon: false,
+    removalMode: true
+});
+
+let selectedStudyArea = null;
+
+// Handle the creation of a new study area
+map.on("pm:create", async (event) => {
+
+    if (selectedStudyArea) {
+        map.removeLayer(selectedStudyArea);
+    }
+
+    selectedStudyArea = event.layer;
+
+    const geojson = selectedStudyArea.toGeoJSON();
+
+    console.log("Selected study area:");
+    console.log(geojson.geometry);
+
+    const response = await fetch(`${API}/api/dynamic-analysis`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            geometry: geojson.geometry,
+            year: Number(yearSelect.value)
+        })
+    });
+
+    const data = await response.json();
+
+    console.log(data);
+
+    const dynamicOverlay = L.tileLayer(data.tileUrl, {
+        opacity: 0.75,
+        maxZoom: 19
+    });
+
+    dynamicOverlay.addTo(map);
+});

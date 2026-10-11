@@ -1,3 +1,4 @@
+import ee
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
@@ -49,6 +50,44 @@ def glacier(year):
             "year": year,
         }), 500
 
+@app.route("/api/dynamic-analysis", methods=["POST"])
+def dynamic_analysis():
+    try:
+        data = request.get_json()
+
+        geometry = data.get("geometry")
+        year = int(data.get("year", 2019))
+
+        if not geometry:
+            return jsonify({
+                "error": "No study area was provided."
+            }), 400
+
+        if not 2017 <= year <= 2024:
+            return jsonify({
+                "error": "Year must be between 2017 and 2024."
+            }), 400
+
+        # Convert Leaflet GeoJSON into Earth Engine geometry
+        study_area = ee.Geometry(geometry)
+
+        # Import dynamic Rob Roy analysis
+        from glacier_analysis import calculate_dynamic_glacier
+
+        result = calculate_dynamic_glacier(
+            year,
+            study_area
+        )
+
+        return jsonify(result)
+    
+
+    except Exception as error:
+        app.logger.exception("Dynamic glacier analysis failed")
+
+        return jsonify({
+            "error": str(error)
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
