@@ -1,6 +1,7 @@
 import ee
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from glacier_analysis import (calculate_automatic_reference_glacier)
 
 app = Flask(__name__)
 CORS(app)
@@ -89,5 +90,78 @@ def dynamic_analysis():
             "error": str(error)
         }), 500
 
+@app.route("/api/reference-candidates", methods=["POST"])
+def reference_candidates():
+    try:
+        data = request.get_json()
+
+        geometry = data.get("geometry")
+
+        if not geometry:
+            return jsonify({
+                "error": "No study area was provided."
+            }), 400
+
+        study_area = ee.Geometry(geometry)
+
+        from glacier_analysis import get_dynamic_reference_candidates
+
+        result = get_dynamic_reference_candidates(
+            study_area
+        )
+
+        return jsonify(result)
+
+    except Exception as error:
+        app.logger.exception(
+            "Reference candidate analysis failed"
+        )
+
+        return jsonify({
+            "error": str(error)
+        }), 500
+
+@app.route("/api/automatic-reference-analysis", methods=["POST"])
+def automatic_reference_analysis():
+
+    data = request.get_json()
+
+    geometry = data.get("geometry")
+    year = int(data.get("year", 2019))
+
+    if not geometry:
+        return jsonify({
+            "error": "Geometry is required."
+        }), 400
+
+    if not 2017 <= year <= 2024:
+        return jsonify({
+            "error": "Year must be between 2017 and 2024."
+        }), 400
+
+    try:
+        study_area = ee.Geometry(geometry)
+
+        # from glacier_analysis import (
+        #     calculate_automatic_reference_glacier
+        # )
+
+        result = calculate_automatic_reference_glacier(
+            year,
+            study_area
+        )
+
+        return jsonify(result)
+
+    except Exception as exc:
+
+        app.logger.exception(
+            "Automatic reference analysis failed"
+        )
+
+        return jsonify({
+            "error": str(exc)
+        }), 500
+    
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

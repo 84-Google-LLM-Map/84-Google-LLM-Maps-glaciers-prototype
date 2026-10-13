@@ -538,6 +538,8 @@ map.pm.addControls({
 });
 
 let selectedStudyArea = null;
+let dynamicOverlay = null;
+let referenceCandidateOverlay = null;
 
 // Handle the creation of a new study area
 map.on("pm:create", async (event) => {
@@ -553,6 +555,11 @@ map.on("pm:create", async (event) => {
     console.log("Selected study area:");
     console.log(geojson.geometry);
 
+
+    // -------------------------------------------------
+    // Dynamic glacier analysis
+    // -------------------------------------------------
+
     const response = await fetch(`${API}/api/dynamic-analysis`, {
         method: "POST",
         headers: {
@@ -565,13 +572,114 @@ map.on("pm:create", async (event) => {
     });
 
     const data = await response.json();
+    const manualArea = data.area;
 
+    console.log("Dynamic analysis:");
     console.log(data);
 
-    const dynamicOverlay = L.tileLayer(data.tileUrl, {
+    if (dynamicOverlay) {
+        map.removeLayer(dynamicOverlay);
+    }
+
+    dynamicOverlay = L.tileLayer(data.tileUrl, {
         opacity: 0.75,
         maxZoom: 19
     });
 
     dynamicOverlay.addTo(map);
+
+
+    // -------------------------------------------------
+    // Automatic reference candidates
+    // -------------------------------------------------
+
+    const referenceResponse = await fetch(
+        `${API}/api/reference-candidates`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                geometry: geojson.geometry
+            })
+        }
+    );
+
+    const referenceData = await referenceResponse.json();
+
+    console.log("Reference candidates:");
+    console.log(referenceData);
+
+    if (referenceCandidateOverlay) {
+        map.removeLayer(referenceCandidateOverlay);
+    }
+
+    referenceCandidateOverlay = L.tileLayer(
+        referenceData.tileUrl,
+        {
+            opacity: 0.85,
+            maxZoom: 19
+        }
+    );
+
+    referenceCandidateOverlay.addTo(map);
+
+    // -------------------------------------------------
+    // Automatic-reference glacier analysis
+    // -------------------------------------------------
+
+    const automaticResponse = await fetch(
+        `${API}/api/automatic-reference-analysis`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                geometry: geojson.geometry,
+                year: Number(yearSelect.value)
+            })
+        }
+    );
+
+    const automaticData = await automaticResponse.json();
+
+    console.log("Automatic reference analysis:");
+    console.log(automaticData);
+
+    // -----------------------------------------------------
+    // MANUAL VS AUTOMATIC REFERENCE COMPARISON
+    // -----------------------------------------------------
+
+    if (
+        manualArea !== undefined &&
+        automaticData.area !== undefined
+    ) {
+        const automaticArea = automaticData.area;
+
+        const areaDifference =
+            automaticArea - manualArea;
+
+        const percentageDifference =
+            manualArea !== 0
+                ? (areaDifference / manualArea) * 100
+                : null;
+
+        console.log("Manual vs automatic comparison:");
+        console.log({
+            year: Number(yearSelect.value),
+
+            manualReferenceArea: manualArea,
+
+            automaticReferenceArea: automaticArea,
+
+            areaDifference: areaDifference,
+
+            percentageDifference: percentageDifference,
+
+            referenceSimilarity:
+                automaticData.manualAutomaticReferenceSimilarity
+        });
+    }
 });
