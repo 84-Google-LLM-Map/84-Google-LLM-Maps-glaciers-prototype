@@ -1,8 +1,33 @@
-from flask import Flask, jsonify, request
+from pathlib import Path
+
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
+
+BASE = Path(__file__).resolve().parent
+FRONTEND = BASE.parent / "frontend"
+
+
+@app.route("/")
+def index():
+    return send_from_directory(str(FRONTEND), "index.html")
+
+
+@app.route("/style.css")
+def stylesheet():
+    return send_from_directory(str(FRONTEND), "style.css")
+
+
+@app.route("/app.js")
+def javascript():
+    return send_from_directory(str(FRONTEND), "app.js")
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/glacier/<int:year>")
@@ -41,14 +66,14 @@ def glacier(year):
 
         return jsonify(result)
 
-    except Exception as exc:
+    except Exception:
         app.logger.exception("Glacier analysis failed")
         return jsonify({
-            "error": str(exc),
+            "error": "Glacier analysis failed. Please try again.",
             "glacierId": glacier_id,
             "year": year,
         }), 500
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(port=5000)
