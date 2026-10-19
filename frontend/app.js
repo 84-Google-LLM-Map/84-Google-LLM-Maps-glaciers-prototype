@@ -3,6 +3,7 @@ const API = "";
 
 // Glacier locations
 const glaciers = {
+
     "rob-roy": {
         name: "Rob Roy",
         centre: [-44.455, 168.741],
@@ -13,6 +14,36 @@ const glaciers = {
         name: "Marmolada",
         centre: [46.43522, 11.857975],
         zoom: 13
+    },
+
+    "aletsch": {
+        name: "Aletsch",
+        centre: [46.45424, 8.07374],
+        zoom: 10
+    },
+
+    "rhone": {
+        name: "Rhône",
+        centre: [46.62, 8.40],
+        zoom: 11
+    },
+
+    "mendenhall": {
+        name: "Mendenhall",
+        centre: [58.49583, -134.53222],
+        zoom: 11
+    },
+
+    "franz-josef": {
+        name: "Franz Josef",
+        centre: [-43.475331, 170.199855],
+        zoom: 11
+    },
+
+    "gangotri": {
+        name: "Gangotri",
+        centre: [30.82845, 79.17748],
+        zoom: 10
     }
 };
 

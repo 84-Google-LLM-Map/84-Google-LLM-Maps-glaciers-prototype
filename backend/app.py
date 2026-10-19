@@ -3,6 +3,8 @@ from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
+from glaciers import GLACIERS
+
 app = Flask(__name__)
 CORS(app)
 
@@ -32,48 +34,102 @@ def health():
 
 @app.route("/api/glacier/<int:year>")
 def glacier(year):
+
+    # -----------------------------------------------------
+    # VALIDATE YEAR
+    # -----------------------------------------------------
+
     if not 2017 <= year <= 2024:
         return jsonify({
             "error": "Year must be between 2017 and 2024."
         }), 400
 
-    glacier_id = request.args.get("glacier", "rob-roy").strip().lower()
 
-    if glacier_id not in ("rob-roy", "marmolada"):
+    # -----------------------------------------------------
+    # GET SELECTED GLACIER
+    # -----------------------------------------------------
+
+    glacier_id = (
+        request.args
+        .get("glacier", "rob-roy")
+        .strip()
+        .lower()
+    )
+
+
+    # -----------------------------------------------------
+    # VALIDATE GLACIER
+    # -----------------------------------------------------
+
+    # Marmolada remains separate because it still uses
+    # the provisional demo analysis.
+    valid_glaciers = list(GLACIERS.keys()) + ["marmolada"]
+
+    if glacier_id not in valid_glaciers:
         return jsonify({
-            "error": "Glacier must be rob-roy or marmolada."
+            "error": (
+                f"Unknown glacier '{glacier_id}'. "
+                f"Available glaciers: {', '.join(valid_glaciers)}"
+            )
         }), 400
 
+
     try:
+
+        # -------------------------------------------------
+        # MARMOLADA
+        # -------------------------------------------------
+
         if glacier_id == "marmolada":
+
             from marmolada_analysis import calculate_glacier
 
-            name = "Marmolada"
-            centre = [11.857975, 46.43522]
+            result = dict(
+                calculate_glacier(year)
+            )
+
+            # Ensure frontend receives the selected ID
+            result["glacierId"] = glacier_id
+
+
+        # -------------------------------------------------
+        # ALL MANUALLY REFERENCED GLACIERS
+        # -------------------------------------------------
+
         else:
+
             from glacier_analysis import calculate_glacier
 
-            name = "Rob Roy"
-            centre = [168.741, -44.455]
+            result = dict(
+                calculate_glacier(
+                    glacier_id,
+                    year
+                )
+            )
 
-        result = dict(calculate_glacier(year))
-        result.update({
-            "glacierId": glacier_id,
-            "glacier": name,
-            "studyCentre": centre,
-            "areaUnit": "km2",
-        })
+
+        # -------------------------------------------------
+        # RETURN RESULT
+        # -------------------------------------------------
 
         return jsonify(result)
 
-    except Exception:
-        app.logger.exception("Glacier analysis failed")
+
+    except Exception as exc:
+
+        app.logger.exception(
+            "Glacier analysis failed"
+        )
+
         return jsonify({
             "error": "Glacier analysis failed. Please try again.",
             "glacierId": glacier_id,
-            "year": year,
+            "year": year
         }), 500
 
 
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(
+        debug=True,
+        port=5000
+    )
