@@ -963,10 +963,11 @@ def calculate_automatic_reference_glacier(year, study_area):
     # 8. MAP
     # -----------------------------------------------------
 
+    # Yellow = final experimental dynamic-analysis result
     map_info = glacier_like.getMapId({
         "min": 1,
         "max": 1,
-        "palette": ["00FF00"]
+        "palette": ["FFFF00"]
     })
 
     return {
