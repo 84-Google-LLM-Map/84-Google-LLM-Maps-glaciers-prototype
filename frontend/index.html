@@ -10,8 +10,13 @@
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   >
 
-    <!-- Our styling -->
+  <!-- Our styling -->
   <link rel="stylesheet" href="style.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Our JavaScript -->
   <script src="app.js" defer></script>
 </head>
 
@@ -29,6 +34,8 @@
         <option value="franz-josef">Franz Josef Glacier</option>
         <option value="gangotri">Gangotri Glacier</option>
     </select>
+
+
     <!-- Timeline -->
     <div class="timeline-section">
 
@@ -96,10 +103,14 @@
 
     </div>
 
+
+    <!-- Status -->
     <p id="status" role="status" aria-live="polite">
       Select a year and click View Year.
     </p>
 
+
+    <!-- Glacier Analysis -->
     <div id="resultsSection" class="results-section" hidden>
 
         <h3>Glacier Analysis</h3>
@@ -150,32 +161,63 @@
             </div>
 
         </div>
+
+
+        <!-- Glacier Area Timeline Graph -->
+        <div class="area-chart-section">
+
+            <div class="section-heading">
+                <h3>Glacier-like Area Over Time</h3>
+
+                <p>
+                    Detected glacier-like area from 2017–2024.
+                </p>
+            </div>
+
+            <div class="area-chart-wrapper">
+                <canvas id="areaChart"></canvas>
+            </div>
+
+        </div>
+
     </div>
 
+
+    <!-- Warning -->
     <p id="warning" hidden></p>
 
+
+    <!-- Analysis Note -->
     <p class="note">
       The cyan overlay shows pixels matching the reference.
       The satellite basemap does not change with the selected year.
       Results are not measurements of ice-volume loss.
     </p>
+
   </aside>
 
+
+  <!-- Maps -->
   <div id="map-container">
 
+    <!-- First Map -->
     <div id="first-map-container">
         <div id="first-map-label">2019</div>
         <div id="map" aria-label="Glacier map"></div>
     </div>
 
+
+    <!-- Second Map -->
     <div id="second-map-container" hidden>
         <div id="second-map-label">Second Year</div>
         <div id="secondMap"></div>
     </div>
 
-</div>
+  </div>
 
+
+  <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
 </body>
 </html>

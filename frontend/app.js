@@ -82,6 +82,7 @@ const firstMapLabel = document.getElementById("first-map-label");
 const secondMapLabel = document.getElementById("second-map-label");
 const secondMapContainer = document.getElementById("second-map-container");
 
+let areaChart = null;
 
 // Cache
 const glacierCache = {};
@@ -268,6 +269,9 @@ async function loadYear(year, isSecondYear = false) {
     try {
 
         await preloadGlacier(glacierId);
+
+        // Update the 2017–2024 graph
+        updateAreaChart(glacierId);
 
         const data = glacierCache[glacierId][year];
 
@@ -531,6 +535,100 @@ viewSecondYearButton.addEventListener("click", async () => {
     await loadYear(year, true);
 });
 
+function updateAreaChart(glacierId) {
+
+    const timeline = glacierCache[glacierId];
+
+    if (!timeline) {
+        return;
+    }
+
+    const years = [
+        2017, 2018, 2019, 2020,
+        2021, 2022, 2023, 2024
+    ];
+
+    const areas = years.map(year => {
+        const data = timeline[year];
+
+        return data && Number.isFinite(data.area)
+            ? data.area
+            : null;
+    });
+
+    const canvas = document.getElementById("areaChart");
+
+    if (!canvas) {
+        return;
+    }
+
+    if (areaChart) {
+        areaChart.destroy();
+    }
+
+    areaChart = new Chart(canvas, {
+        type: "line",
+
+        data: {
+            labels: years,
+
+            datasets: [{
+                label: "Glacier-like area (km²)",
+                data: areas,
+
+                borderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+
+                tension: 0.2,
+                fill: false
+            }]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: {
+                    display: false
+                },
+
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.parsed.y.toFixed(2)} km²`;
+                        }
+                    }
+                }
+            },
+
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Year"
+                    }
+                },
+
+                y: {
+                    beginAtZero: false,
+
+                    title: {
+                        display: true,
+                        text: "Area (km²)"
+                    },
+
+                    ticks: {
+                        callback: function(value) {
+                            return `${value} km²`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
 
 // Keep maps aligned
 map.on("move", () => {
