@@ -2,8 +2,19 @@ const API = "http://localhost:5000";
 
 
 /* =========================
-   Glacier configuration
+   Configuration
    ========================= */
+
+const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
+
+const DEFAULT_YEAR = "2019";
+
+// Chart colours (overlay red matches the backend palette)
+const COLOUR_FIRST = "#d9443a";
+const COLOUR_SECOND = "#202124";
+const COLOUR_OTHER = "#c4c9ce";
+
+const OVERLAY_OPACITY = 0.8;
 
 const glaciers = {
 
@@ -52,404 +63,549 @@ const glaciers = {
 
 
 /* =========================
-   Elements
+   Icons (map buttons + legend)
    ========================= */
 
-const glacierSelect = document.getElementById("glacier");
+const STROKE =
+    'fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"';
 
-const yearSelect = document.getElementById("year");
-const secondYearSelect = document.getElementById("secondYear");
+const ICONS = {
 
-const yearSlider = document.getElementById("yearSlider");
-const sliderYear = document.getElementById("sliderYear");
+    satellite:
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<g transform="rotate(-45 12 12)">' +
+        // solar panels with cell lines
+        '<rect x="0.5" y="8" width="7.5" height="8" fill="currentColor"/>' +
+        '<rect x="16" y="8" width="7.5" height="8" fill="currentColor"/>' +
+        '<path d="M3 8v8M5.5 8v8M18.5 8v8M21 8v8M0.5 12h7.5M16 12h7.5" ' +
+        'stroke="#fff" stroke-width=".7"/>' +
+        // arms and body
+        '<path d="M8 12h2M14 12h2" stroke="currentColor" stroke-width="1.4"/>' +
+        '<rect x="10" y="8.5" width="4" height="7" rx=".8" fill="currentColor"/>' +
+        // dish
+        '<path d="M9.2 19.5a2.8 2.8 0 0 0 5.6 0Z" fill="currentColor"/>' +
+        '<path d="M12 15.5v4" stroke="currentColor" stroke-width="1.2"/>' +
+        '</g>' +
+        '</svg>',
 
-const viewButton = document.getElementById("view");
-const viewSecondYearButton =
-    document.getElementById("viewSecondYear");
+    hand:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" ' + STROKE + '>' +
+        '<path d="M18 11V6a2 2 0 0 0-4 0"/>' +
+        '<path d="M14 10V4a2 2 0 0 0-4 0v2"/>' +
+        '<path d="M10 10.5V6a2 2 0 0 0-4 0v8"/>' +
+        '<path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>' +
+        '</svg>',
 
-const status = document.getElementById("status");
-const warning = document.getElementById("warning");
+    line:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" ' + STROKE + '>' +
+        '<polyline points="3,7 10,17 21,6"/>' +
+        '</svg>',
 
-const resultsSection =
-    document.getElementById("resultsSection");
+    rectangle:
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<rect x="4" y="4" width="16" height="16" fill="currentColor"/>' +
+        '</svg>',
 
-const firstResultYear =
-    document.getElementById("firstResultYear");
+    polygon:
+        '<svg viewBox="0 0 24 24" aria-hidden="true" ' + STROKE + ' stroke-width="1.8">' +
+        '<path d="M12 3.5 20.5 9.5 17.5 20h-11L3.5 9.5Z"/>' +
+        '</svg>'
+};
 
-const firstArea =
-    document.getElementById("firstArea");
-
-const firstReference =
-    document.getElementById("firstReference");
-
-const firstThreshold =
-    document.getElementById("firstThreshold");
-
-const secondResultCard =
-    document.getElementById("secondResultCard");
-
-const secondResultYear =
-    document.getElementById("secondResultYear");
-
-const secondArea =
-    document.getElementById("secondArea");
-
-const secondReference =
-    document.getElementById("secondReference");
-
-const secondThreshold =
-    document.getElementById("secondThreshold");
-
-const firstMapLabel =
-    document.getElementById("first-map-label");
-
-const secondMapLabel =
-    document.getElementById("second-map-label");
-
-const secondMapContainer =
-    document.getElementById("second-map-container");
-
-let areaChart = null;
-
-/* =========================
-   Populate year selectors
-   ========================= */
-
-for (let year = 2017; year <= 2024; year++) {
-
-    const option = document.createElement("option");
-
-    option.value = year;
-    option.textContent = year;
-
-    yearSelect.appendChild(option);
-
-
-    const secondOption =
-        document.createElement("option");
-
-    secondOption.value = year;
-    secondOption.textContent = year;
-
-    secondYearSelect.appendChild(secondOption);
-}
-
-yearSelect.value = "2019";
-secondYearSelect.value = "2024";
-
-
-/* =========================
-   Main map
-   ========================= */
-
-const map = L.map("map").setView(
-    glaciers["rob-roy"].centre,
-    glaciers["rob-roy"].zoom
-);
-
-
-/* =========================
-   Base layers
-   ========================= */
-
-const satelliteLayer = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/" +
-    "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    {
-        maxZoom: 19,
-        attribution:
-            "Tiles © Esri"
-    }
-);
-
-const osmLayer = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-        maxZoom: 19,
-        attribution:
-            "© OpenStreetMap contributors"
-    }
-);
-
-satelliteLayer.addTo(map);
-
-L.control.layers(
-    {
-        "Satellite": satelliteLayer,
-        "OpenStreetMap": osmLayer
-    }
-).addTo(map);
-
-
-/* =========================
-   Geoman drawing controls
-   ========================= */
-
-map.pm.addControls({
-    position: "topleft",
-
-    drawMarker: false,
-    drawCircleMarker: false,
-    drawPolyline: false,
-    drawCircle: false,
-
-    drawRectangle: true,
-    drawPolygon: true,
-
-    editMode: true,
-    dragMode: false,
-    cutPolygon: false,
-    removalMode: true
+document.querySelectorAll("[data-icon]").forEach((element) => {
+    element.innerHTML = ICONS[element.dataset.icon] || "";
 });
 
 
 /* =========================
-   Map layers
+   Elements
    ========================= */
+
+const $ = (id) => document.getElementById(id);
+
+const glacierSelect = $("glacier");
+const glacierSubtitle = $("glacierSubtitle");
+
+const yearSelect = $("year");
+const secondYearSelect = $("secondYear");
+
+const yearSlider = $("yearSlider");
+const sliderYear = $("sliderYear");
+const sliderEnabled = $("sliderEnabled");
+
+const viewButton = $("view");
+const viewSecondYearButton = $("viewSecondYear");
+const analyseButton = $("analyse");
+
+const status = $("status");
+const warning = $("warning");
+
+const resultGlacierName = $("resultGlacierName");
+
+const firstMapLabel = $("first-map-label");
+const secondMapLabel = $("second-map-label");
+const secondMapContainer = $("second-map-container");
+
+const coordSearch = $("coordSearch");
+const coordInput = $("coordInput");
+const experimentalResult = $("experimentalResult");
+
+const a11yButton = $("a11yButton");
+const a11yDialog = $("a11yDialog");
+
+
+/* =========================
+   State
+   ========================= */
+
+// glacierCache[glacierId][year] = API result
+const glacierCache = {};
+const pendingRequests = {};
+
+let firstData = null;
+let secondData = null;
+
+let areaChart = null;
 
 let firstOverlay = null;
 let secondOverlay = null;
 
 let secondMap = null;
-let secondSatelliteLayer = null;
-
-
-/* =========================
-   Experimental analysis
-   ========================= */
+let secondSatellite = null;
+let secondStreets = null;
 
 let selectedStudyArea = null;
 let dynamicOverlay = null;
 
 
 /* =========================
-   Get glacier
+   Helpers
    ========================= */
 
 function getSelectedGlacier() {
-
     return glacierSelect.value;
 }
 
-
-/* =========================
-   Move map to glacier
-   ========================= */
-
-function moveToSelectedGlacier() {
-
-    const glacierId =
-        getSelectedGlacier();
-
-    const glacier =
-        glaciers[glacierId];
-
-    map.setView(
-        glacier.centre,
-        glacier.zoom
-    );
-
-    if (secondMap) {
-
-        secondMap.setView(
-            glacier.centre,
-            glacier.zoom
-        );
-    }
+function getSelectedGlacierName() {
+    return glacierSelect.selectedOptions[0].textContent.trim();
 }
 
+function isExperimentalMode() {
+    return document.body.dataset.mode === "experimental";
+}
+
+function setStatus(message, isError = false) {
+    status.className = isError ? "error" : "";
+    status.textContent = message;
+}
+
+function formatArea(area) {
+    return `${Number(area).toFixed(2)} km²`;
+}
+
+function setBusy(busy) {
+    viewButton.disabled = busy;
+    viewSecondYearButton.disabled = busy;
+    analyseButton.disabled = busy;
+}
+
+
 /* =========================
-   Timeline cache (for graph)
+   Year controls
    ========================= */
 
-const glacierCache = {};
+YEARS.forEach((year) => {
+    yearSelect.add(new Option(year, year));
+    secondYearSelect.add(new Option(year, year));
+});
 
-const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
+secondYearSelect.insertBefore(
+    new Option("None", ""),
+    secondYearSelect.firstChild
+);
 
-async function preloadGlacier(glacierId) {
+yearSelect.value = DEFAULT_YEAR;
+secondYearSelect.value = "";
 
-    if (glacierCache[glacierId]) {
+yearSlider.min = YEARS[0];
+yearSlider.max = YEARS[YEARS.length - 1];
+yearSlider.value = DEFAULT_YEAR;
+sliderYear.textContent = DEFAULT_YEAR;
+
+function setFirstYearControls(year) {
+    yearSelect.value = String(year);
+    yearSlider.value = String(year);
+    sliderYear.textContent = String(year);
+}
+
+
+/* =========================
+   Main map
+   ========================= */
+
+const satelliteUrl =
+    "https://server.arcgisonline.com/ArcGIS/rest/services/" +
+    "World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+const streetsUrl =
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+const map = L.map("map", {
+    zoomControl: false
+}).setView(
+    glaciers["rob-roy"].centre,
+    glaciers["rob-roy"].zoom
+);
+
+L.control.zoom({ position: "topleft" }).addTo(map);
+
+const satelliteLayer = L.tileLayer(satelliteUrl, {
+    maxZoom: 19,
+    attribution: "Tiles © Esri"
+}).addTo(map);
+
+const streetsLayer = L.tileLayer(streetsUrl, {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap contributors"
+});
+
+// Lines drawn in Experimental Explorer (annotations only)
+const drawnLines = L.featureGroup().addTo(map);
+
+
+/* =========================
+   Satellite button
+   ========================= */
+
+let satelliteButton = null;
+
+const SatelliteControl = L.Control.extend({
+
+    options: { position: "topleft" },
+
+    onAdd() {
+
+        const bar = L.DomUtil.create("div", "leaflet-bar");
+        const button = L.DomUtil.create("button", "map-btn satellite-btn", bar);
+
+        button.type = "button";
+        button.title = "Toggle satellite imagery";
+        button.setAttribute("aria-label", "Toggle satellite imagery");
+        button.setAttribute("aria-pressed", "true");
+        button.innerHTML = ICONS.satellite;
+
+        L.DomEvent.disableClickPropagation(bar);
+        button.addEventListener("click", toggleBasemap);
+
+        satelliteButton = button;
+        return bar;
+    }
+});
+
+new SatelliteControl().addTo(map);
+
+function toggleBasemap() {
+
+    const showSatellite = !map.hasLayer(satelliteLayer);
+
+    swapBase(map, satelliteLayer, streetsLayer, showSatellite);
+
+    if (secondMap) {
+        swapBase(secondMap, secondSatellite, secondStreets, showSatellite);
+    }
+
+    satelliteButton.setAttribute("aria-pressed", String(showSatellite));
+}
+
+function swapBase(targetMap, satellite, streets, showSatellite) {
+
+    const add = showSatellite ? satellite : streets;
+    const remove = showSatellite ? streets : satellite;
+
+    if (targetMap.hasLayer(remove)) {
+        targetMap.removeLayer(remove);
+    }
+
+    add.addTo(targetMap);
+    add.bringToBack();
+}
+
+
+/* =========================
+   Drawing toolbar (Experimental Explorer)
+   ========================= */
+
+const DRAW_TOOLS = [
+    { id: "move", label: "Stop drawing / move map", icon: "hand" },
+    { id: "Line", label: "Draw line", icon: "line" },
+    { id: "Rectangle", label: "Draw rectangle", icon: "rectangle" },
+    { id: "Polygon", label: "Draw shape", icon: "polygon" }
+];
+
+const toolButtons = {};
+
+const DrawToolbar = L.Control.extend({
+
+    options: { position: "topright" },
+
+    onAdd() {
+
+        const bar = L.DomUtil.create("div", "leaflet-bar draw-toolbar experimental-only");
+
+        DRAW_TOOLS.forEach((tool) => {
+
+            const button = L.DomUtil.create("button", "map-btn", bar);
+
+            button.type = "button";
+            button.title = tool.label;
+            button.setAttribute("aria-label", tool.label);
+            button.innerHTML = ICONS[tool.icon];
+
+            button.addEventListener("click", () => selectTool(tool.id));
+
+            toolButtons[tool.id] = button;
+        });
+
+        L.DomEvent.disableClickPropagation(bar);
+        L.DomEvent.disableScrollPropagation(bar);
+
+        return bar;
+    }
+});
+
+new DrawToolbar().addTo(map);
+
+map.pm.setGlobalOptions({
+    pathOptions: {
+        color: "#111",
+        weight: 2,
+        fillColor: "#111",
+        fillOpacity: 0.08
+    }
+});
+
+function selectTool(toolId) {
+
+    if (toolId === "move") {
+        map.pm.disableDraw();
+        setActiveTool("move");
         return;
     }
 
-    glacierCache[glacierId] = {};
-
-    await Promise.all(YEARS.map(async (year) => {
-
-        try {
-            const response = await fetch(
-                `${API}/api/glacier/${year}?glacier=${glacierId}`
-            );
-
-            const data = await response.json();
-
-            if (!response.ok || data.error) {
-                throw new Error(data.error || `Could not load ${year}`);
-            }
-
-            glacierCache[glacierId][year] = data;
-
-        } catch (error) {
-            console.error(`Could not cache ${glacierId} ${year}:`, error);
-        }
-    }));
+    map.pm.enableDraw(toolId);
+    setActiveTool(toolId);
 }
+
+function setActiveTool(toolId) {
+
+    Object.entries(toolButtons).forEach(([id, button]) => {
+        const active = id === toolId;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+    });
+}
+
+map.on("pm:drawstart", (event) => setActiveTool(event.shape));
+map.on("pm:drawend", () => setActiveTool("move"));
+
+setActiveTool("move");
+
 
 /* =========================
-   Get glacier data
+   Fetching glacier data
    ========================= */
 
-async function getGlacierData(year) {
+function fetchYear(glacierId, year) {
 
-    const glacierId = getSelectedGlacier();
+    year = Number(year);
 
-    await preloadGlacier(glacierId);
+    glacierCache[glacierId] = glacierCache[glacierId] || {};
 
-    const data = glacierCache[glacierId][year];
-
-    if (!data) {
-        throw new Error("Glacier analysis failed.");
+    if (glacierCache[glacierId][year]) {
+        return Promise.resolve(glacierCache[glacierId][year]);
     }
 
-    return data;
+    const key = `${glacierId}:${year}`;
+
+    if (!pendingRequests[key]) {
+
+        pendingRequests[key] = fetch(
+            `${API}/api/glacier/${year}?glacier=${encodeURIComponent(glacierId)}`
+        )
+            .then(async (response) => {
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok || data.error) {
+                    throw new Error(
+                        data.error || `Request failed (${response.status})`
+                    );
+                }
+
+                if (
+                    !Number.isFinite(Number(data.area)) ||
+                    typeof data.tileUrl !== "string"
+                ) {
+                    throw new Error("The backend returned incomplete analysis data.");
+                }
+
+                glacierCache[glacierId][year] = data;
+
+                // Fill in the graph as each year arrives
+                if (glacierId === getSelectedGlacier()) {
+                    updateAreaChart();
+                }
+
+                return data;
+            })
+            .finally(() => {
+                delete pendingRequests[key];
+            });
+    }
+
+    return pendingRequests[key];
 }
+
+// Load the remaining years in the background for the graph
+function preloadTimeline(glacierId) {
+
+    YEARS.forEach((year) => {
+        fetchYear(glacierId, year).catch((error) => {
+            console.warn(`Could not load ${glacierId} ${year}:`, error);
+        });
+    });
+}
+
+function makeOverlay(data) {
+
+    if (!data.tileUrl || Number(data.area) <= 0) {
+        return null;
+    }
+
+    return L.tileLayer(data.tileUrl, {
+        opacity: OVERLAY_OPACITY,
+        maxZoom: 19
+    });
+}
+
+
+/* =========================
+   Results
+   ========================= */
+
+function fillCard(prefix, data) {
+
+    $(`${prefix}Area`).textContent = formatArea(data.area);
+    $(`${prefix}ResultYear`).textContent = data.year;
+    $(`${prefix}Reference`).textContent = data.referenceYear;
+    $(`${prefix}Threshold`).textContent = Number(data.threshold).toFixed(2);
+}
+
+function resetCard(prefix) {
+
+    ["Area", "ResultYear", "Reference", "Threshold"].forEach((field) => {
+        $(`${prefix}${field}`).textContent = "—";
+    });
+}
+
+function showBackendWarning(data) {
+
+    if (data && data.warning) {
+        warning.textContent = data.warning;
+        warning.hidden = false;
+    } else {
+        warning.hidden = true;
+        warning.textContent = "";
+    }
+}
+
 
 /* =========================
    Load first year
    ========================= */
 
-async function loadYear(year, updateMap = true) {
+async function loadYear(year) {
 
-    status.className = "";
+    const glacierId = getSelectedGlacier();
+    const glacierName = getSelectedGlacierName();
 
-    status.textContent =
-        `Loading ${year} glacier analysis…`;
+    setFirstYearControls(year);
+    firstMapLabel.textContent = year;
 
-    viewButton.disabled = true;
+    setStatus(`Loading ${glacierName} for ${year}…`);
+    setBusy(true);
 
     try {
 
-        const glacierId = getSelectedGlacier();
+        const data = await fetchYear(glacierId, year);
 
-        const data = await getGlacierData(year);
-
-        // Update the 2017–2024 graph
-        updateAreaChart(glacierId);
-
-        /* Remove old first-year overlay */
-
-        if (firstOverlay) {
-
-            map.removeLayer(
-                firstOverlay
-            );
-
-            firstOverlay = null;
+        // The user switched glacier while this was loading
+        if (glacierId !== getSelectedGlacier()) {
+            return null;
         }
 
+        if (firstOverlay) {
+            map.removeLayer(firstOverlay);
+        }
 
-        /* Add new first-year overlay */
+        firstOverlay = makeOverlay(data);
 
-        if (
-            data.tileUrl &&
-            Number(data.area) > 0
-        ) {
-
-            firstOverlay =
-                L.tileLayer(
-                    data.tileUrl,
-                    {
-                        opacity: 0.7,
-                        maxZoom: 19
-                    }
-                );
-
+        if (firstOverlay) {
             firstOverlay.addTo(map);
         }
 
+        firstData = data;
 
-        /* Update results */
+        fillCard("first", data);
+        showBackendWarning(data);
+        updateAreaChart();
 
-        resultsSection.hidden = false;
-
-        firstResultYear.textContent =
-            data.year;
-
-        firstArea.textContent =
-            `${Number(data.area).toFixed(2)} km²`;
-
-        firstReference.textContent =
-            data.referenceYear;
-
-        firstThreshold.textContent =
-            Number(data.threshold).toFixed(2);
-
-        firstMapLabel.textContent =
-            data.year;
-
-
-        /* Warning */
-
-        if (data.warning) {
-
-            warning.hidden = false;
-            warning.textContent =
-                data.warning;
-
-        } else {
-
-            warning.hidden = true;
-            warning.textContent = "";
-        }
-
-
-        /* Status */
-
-        if (Number(data.area) === 0) {
-
-            status.textContent =
-                `No glacier-like area was detected for ${year}.`;
-
-        } else {
-
-            status.textContent =
-                `${data.glacier || "Glacier"} — ${year}: ` +
-                `${Number(data.area).toFixed(2)} km² ` +
-                `glacier-like area detected.`;
-        }
-
-
-        /* Move map if requested */
-
-        if (updateMap) {
-
-            moveToSelectedGlacier();
-        }
-
+        setStatus(
+            Number(data.area) === 0
+                ? `${glacierName} — ${year}: no glacier-like area detected.`
+                : `${glacierName} — ${year}: ${formatArea(data.area)} glacier-like area detected.`
+        );
 
         return data;
 
     } catch (error) {
 
         console.error(error);
-
-        status.className = "error";
-
-        status.textContent =
-            `Unable to load ${year}: ${error.message}`;
-
+        setStatus(`Unable to load ${year}: ${error.message}`, true);
         return null;
 
     } finally {
 
-        viewButton.disabled = false;
+        setBusy(false);
     }
 }
 
 
 /* =========================
-   Create second map
+   Second map
    ========================= */
+
+let syncingMaps = false;
+
+function syncMaps(source, target) {
+
+    if (syncingMaps || !target) {
+        return;
+    }
+
+    syncingMaps = true;
+
+    target.setView(
+        source.getCenter(),
+        source.getZoom(),
+        { animate: false }
+    );
+
+    syncingMaps = false;
+}
+
+map.on("move", () => syncMaps(map, secondMap));
 
 function createSecondMap() {
 
@@ -457,95 +613,53 @@ function createSecondMap() {
         return;
     }
 
-    const glacier =
-        glaciers[getSelectedGlacier()];
-
-    secondMap = L.map(
-        "secondMap",
-        {
-            zoomControl: true
-        }
-    ).setView(
-        glacier.centre,
+    secondMap = L.map("secondMap", {
+        zoomControl: false
+    }).setView(
+        map.getCenter(),
         map.getZoom()
     );
 
-
-    secondSatelliteLayer =
-        L.tileLayer(
-            "https://server.arcgisonline.com/ArcGIS/rest/services/" +
-            "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            {
-                maxZoom: 19,
-                attribution:
-                    "Tiles © Esri"
-            }
-        );
-
-    secondSatelliteLayer.addTo(
-        secondMap
-    );
-
-
-    /* Keep maps synchronised */
-
-    map.on("move", function () {
-
-        if (!secondMap) {
-            return;
-        }
-
-        const centre =
-            map.getCenter();
-
-        const zoom =
-            map.getZoom();
-
-        if (
-            secondMap.getZoom() !== zoom ||
-            !secondMap
-                .getCenter()
-                .equals(centre)
-        ) {
-
-            secondMap.setView(
-                centre,
-                zoom,
-                {
-                    animate: false
-                }
-            );
-        }
+    secondSatellite = L.tileLayer(satelliteUrl, {
+        maxZoom: 19,
+        attribution: "Tiles © Esri"
     });
 
+    secondStreets = L.tileLayer(streetsUrl, {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap contributors"
+    });
 
-    secondMap.on(
-        "move",
-        function () {
+    (map.hasLayer(satelliteLayer) ? secondSatellite : secondStreets)
+        .addTo(secondMap);
 
-            const centre =
-                secondMap.getCenter();
+    secondMap.on("move", () => syncMaps(secondMap, map));
+}
 
-            const zoom =
-                secondMap.getZoom();
+function resizeMaps() {
 
-            if (
-                map.getZoom() !== zoom ||
-                !map
-                    .getCenter()
-                    .equals(centre)
-            ) {
-
-                map.setView(
-                    centre,
-                    zoom,
-                    {
-                        animate: false
-                    }
-                );
-            }
+    setTimeout(() => {
+        map.invalidateSize();
+        if (secondMap) {
+            secondMap.invalidateSize();
         }
-    );
+    }, 100);
+}
+
+function closeSecondMap() {
+
+    secondMapContainer.hidden = true;
+
+    if (secondOverlay && secondMap) {
+        secondMap.removeLayer(secondOverlay);
+    }
+
+    secondOverlay = null;
+    secondData = null;
+
+    resetCard("second");
+    updateAreaChart();
+    resizeMaps();
 }
 
 
@@ -555,570 +669,522 @@ function createSecondMap() {
 
 async function loadSecondYear(year) {
 
-    status.className = "";
+    const glacierId = getSelectedGlacier();
+    const glacierName = getSelectedGlacierName();
 
-    status.textContent =
-        `Loading second year ${year}…`;
-
-    viewSecondYearButton.disabled =
-        true;
+    setStatus(`Loading second year ${year}…`);
+    setBusy(true);
 
     try {
 
-        const data =
-            await getGlacierData(year);
+        const data = await fetchYear(glacierId, year);
 
+        if (glacierId !== getSelectedGlacier()) {
+            return null;
+        }
 
-        /* Show second map */
-
-        secondMapContainer.hidden =
-            false;
-
+        secondMapContainer.hidden = false;
         createSecondMap();
-
-
-        /* Leaflet needs resize */
-
-        setTimeout(() => {
-
-            map.invalidateSize();
-
-            secondMap.invalidateSize();
-
-        }, 100);
-
-
-        /* Remove previous overlay */
+        resizeMaps();
 
         if (secondOverlay) {
-
-            secondMap.removeLayer(
-                secondOverlay
-            );
-
-            secondOverlay = null;
+            secondMap.removeLayer(secondOverlay);
         }
 
+        secondOverlay = makeOverlay(data);
 
-        /* Add second overlay */
-
-        if (
-            data.tileUrl &&
-            Number(data.area) > 0
-        ) {
-
-            secondOverlay =
-                L.tileLayer(
-                    data.tileUrl,
-                    {
-                        opacity: 0.7,
-                        maxZoom: 19
-                    }
-                );
-
-            secondOverlay.addTo(
-                secondMap
-            );
+        if (secondOverlay) {
+            secondOverlay.addTo(secondMap);
         }
 
+        secondData = data;
 
-        /* Results */
+        fillCard("second", data);
+        secondMapLabel.textContent = data.year;
+        updateAreaChart();
 
-        resultsSection.hidden = false;
-        secondResultCard.hidden = false;
+        setStatus(
+            `${glacierName} — ${year}: ${formatArea(data.area)} glacier-like area detected.`
+        );
 
-        secondResultYear.textContent =
-            data.year;
-
-        secondArea.textContent =
-            `${Number(data.area).toFixed(2)} km²`;
-
-        secondReference.textContent =
-            data.referenceYear;
-
-        secondThreshold.textContent =
-            Number(data.threshold).toFixed(2);
-
-        secondMapLabel.textContent =
-            data.year;
-
-
-        status.textContent =
-            `${data.glacier || "Glacier"} — ${year}: ` +
-            `${Number(data.area).toFixed(2)} km² ` +
-            `glacier-like area detected.`;
+        return data;
 
     } catch (error) {
 
         console.error(error);
-
-        status.className = "error";
-
-        status.textContent =
-            `Unable to load ${year}: ${error.message}`;
+        setStatus(`Unable to load ${year}: ${error.message}`, true);
+        return null;
 
     } finally {
 
-        viewSecondYearButton.disabled =
-            false;
+        setBusy(false);
     }
 }
 
-function updateAreaChart(glacierId) {
 
-    const timeline = glacierCache[glacierId];
+/* =========================
+   Area chart (2017–2024)
+   ========================= */
 
-    if (!timeline) {
+function updateAreaChart() {
+
+    const canvas = $("areaChart");
+
+    if (!canvas || typeof Chart === "undefined") {
         return;
     }
 
-    const years = [
-        2017, 2018, 2019, 2020,
-        2021, 2022, 2023, 2024
-    ];
+    const timeline = glacierCache[getSelectedGlacier()] || {};
 
-    const areas = years.map(year => {
+    const areas = YEARS.map((year) => {
         const data = timeline[year];
-
-        return data && Number.isFinite(data.area)
-            ? data.area
-            : null;
+        return data ? Number(data.area) : null;
     });
 
-    const canvas = document.getElementById("areaChart");
+    const firstYear = firstData ? Number(firstData.year) : null;
+    const secondYear = secondData ? Number(secondData.year) : null;
 
-    if (!canvas) {
-        return;
-    }
+    const colours = YEARS.map((year) => {
+        if (year === firstYear) return COLOUR_FIRST;
+        if (year === secondYear) return COLOUR_SECOND;
+        return COLOUR_OTHER;
+    });
 
     if (areaChart) {
-        areaChart.destroy();
+        areaChart.data.datasets[0].data = areas;
+        areaChart.data.datasets[0].backgroundColor = colours;
+        areaChart.update("none");
+        return;
     }
 
     areaChart = new Chart(canvas, {
-        type: "line",
+        type: "bar",
 
         data: {
-            labels: years,
-
+            labels: YEARS,
             datasets: [{
                 label: "Glacier-like area (km²)",
                 data: areas,
-
-                borderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-
-                tension: 0.2,
-                fill: false
+                backgroundColor: colours,
+                borderRadius: 2,
+                maxBarThickness: 34
             }]
         },
 
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
 
             plugins: {
-                legend: {
-                    display: false
-                },
+                legend: { display: false },
 
                 tooltip: {
                     callbacks: {
-                        label: function(context) {
-                            return `${context.parsed.y.toFixed(2)} km²`;
-                        }
+                        label: (context) => formatArea(context.parsed.y)
                     }
                 }
             },
 
             scales: {
                 x: {
-                    title: {
-                        display: true,
-                        text: "Year"
-                    }
+                    grid: { display: false },
+                    title: { display: true, text: "Year" }
                 },
 
                 y: {
-                    beginAtZero: false,
-
-                    title: {
-                        display: true,
-                        text: "Area (km²)"
-                    },
-
-                    ticks: {
-                        callback: function(value) {
-                            return `${value} km²`;
-                        }
-                    }
+                    beginAtZero: true,
+                    title: { display: true, text: "Area (km²)" },
+                    ticks: { callback: (value) => `${value}` }
                 }
             }
         }
     });
 }
 
+
 /* =========================
-   Experimental dynamic
-   area analysis
+   Experimental analysis
    ========================= */
 
-map.on(
-    "pm:create",
-    async function (event) {
+function clearExperimental() {
 
-        /*
-         * The polygon/rectangle drawn by the user
-         * is the STUDY AREA.
-         *
-         * The backend automatically creates the
-         * reference and performs the complete
-         * experimental analysis.
-         */
+    map.pm.disableDraw();
+    setActiveTool("move");
 
-
-        /* Remove previous study area */
-
-        if (
-            selectedStudyArea &&
-            selectedStudyArea !== event.layer
-        ) {
-
-            map.removeLayer(
-                selectedStudyArea
-            );
-        }
-
-        selectedStudyArea =
-            event.layer;
-
-
-        /* Remove previous experimental result */
-
-        if (dynamicOverlay) {
-
-            map.removeLayer(
-                dynamicOverlay
-            );
-
-            dynamicOverlay = null;
-        }
-
-
-        const geojson =
-            selectedStudyArea.toGeoJSON();
-
-        const year =
-            Number(yearSelect.value);
-
-
-        status.className = "";
-
-        status.textContent =
-            `Running experimental dynamic analysis for ${year}…`;
-
-
-        try {
-
-            const response =
-                await fetch(
-                    `${API}/api/automatic-reference-analysis`,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body: JSON.stringify({
-                            geometry:
-                                geojson.geometry,
-
-                            year:
-                                year
-                        })
-                    }
-                );
-
-
-            const data =
-                await response.json();
-
-
-            if (
-                !response.ok ||
-                data.error
-            ) {
-
-                throw new Error(
-                    data.error ||
-                    "Dynamic analysis failed."
-                );
-            }
-
-
-            /*
-             * This tile is the FINAL
-             * automatic-reference analysis.
-             *
-             * It is NOT the intermediate
-             * reference candidate layer.
-             */
-
-            if (
-                data.tileUrl &&
-                Number(data.area) > 0
-            ) {
-
-                dynamicOverlay =
-                    L.tileLayer(
-                        data.tileUrl,
-                        {
-                            opacity: 0.75,
-                            maxZoom: 19
-                        }
-                    );
-
-                dynamicOverlay.addTo(
-                    map
-                );
-            }
-
-
-            if (Number(data.area) === 0) {
-
-                status.textContent =
-                    `Experimental analysis — ${year}: ` +
-                    `no glacier-like area was detected ` +
-                    `inside the selected study area.`;
-
-            } else {
-
-                status.textContent =
-                    `Experimental analysis — ${year}: ` +
-                    `${Number(data.area).toFixed(2)} km² ` +
-                    `glacier-like area detected inside ` +
-                    `the selected study area.`;
-            }
-
-
-            console.log(
-                "Experimental dynamic analysis:",
-                data
-            );
-
-        } catch (error) {
-
-            console.error(error);
-
-            status.className =
-                "error";
-
-            status.textContent =
-                `Dynamic analysis failed: ${error.message}`;
-        }
+    if (selectedStudyArea) {
+        map.removeLayer(selectedStudyArea);
+        selectedStudyArea = null;
     }
-);
+
+    if (dynamicOverlay) {
+        map.removeLayer(dynamicOverlay);
+        dynamicOverlay = null;
+    }
+
+    drawnLines.clearLayers();
+
+    experimentalResult.hidden = true;
+    experimentalResult.textContent = "";
+}
+
+map.on("pm:create", (event) => {
+
+    // Lines are annotations, not study areas
+    if (event.shape === "Line") {
+        drawnLines.addLayer(event.layer);
+        return;
+    }
+
+    if (selectedStudyArea && selectedStudyArea !== event.layer) {
+        map.removeLayer(selectedStudyArea);
+    }
+
+    selectedStudyArea = event.layer;
+
+    runExperimentalAnalysis();
+});
+
+async function runExperimentalAnalysis() {
+
+    if (!selectedStudyArea) {
+        setStatus(
+            "Draw a rectangle or shape on the map first.",
+            true
+        );
+        return;
+    }
+
+    if (dynamicOverlay) {
+        map.removeLayer(dynamicOverlay);
+        dynamicOverlay = null;
+    }
+
+    const year = Number(yearSelect.value);
+
+    setStatus(`Running experimental analysis for ${year}…`);
+    experimentalResult.hidden = true;
+    setBusy(true);
+
+    try {
+
+        const response = await fetch(
+            `${API}/api/automatic-reference-analysis`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    geometry: selectedStudyArea.toGeoJSON().geometry,
+                    year: year,
+                    glacier: getSelectedGlacier()
+                })
+            }
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data.error) {
+            throw new Error(data.error || "Experimental analysis failed.");
+        }
+
+        if (data.tileUrl && Number(data.area) > 0) {
+            dynamicOverlay = L.tileLayer(data.tileUrl, {
+                opacity: OVERLAY_OPACITY,
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        const message =
+            Number(data.area) === 0
+                ? `${year}: no glacier-like area inside the drawn area.`
+                : `${year}: ${formatArea(data.area)} glacier-like area inside the drawn area.`;
+
+        experimentalResult.textContent = message;
+        experimentalResult.hidden = false;
+
+        setStatus(`Experimental analysis — ${message}`);
+
+        console.log("Experimental analysis:", data);
+
+    } catch (error) {
+
+        console.error(error);
+        setStatus(`Experimental analysis failed: ${error.message}`, true);
+
+    } finally {
+
+        setBusy(false);
+    }
+}
+
+
+/* =========================
+   Coordinate search
+   ========================= */
+
+coordSearch.addEventListener("submit", (event) => {
+
+    event.preventDefault();
+
+    const text = coordInput.value.trim();
+
+    // Empty search: zoom to the drawn area
+    if (!text) {
+
+        if (selectedStudyArea) {
+            map.fitBounds(selectedStudyArea.getBounds(), { padding: [40, 40] });
+        } else {
+            setStatus(
+                "Enter coordinates as latitude, longitude, or draw a shape first.",
+                true
+            );
+        }
+
+        return;
+    }
+
+    const match = text.match(
+        /^\s*(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)\s*$/
+    );
+
+    const lat = match ? Number(match[1]) : NaN;
+    const lng = match ? Number(match[2]) : NaN;
+
+    if (
+        !Number.isFinite(lat) || !Number.isFinite(lng) ||
+        Math.abs(lat) > 90 || Math.abs(lng) > 180
+    ) {
+        setStatus(
+            "Enter coordinates as latitude, longitude — for example -44.455, 168.741.",
+            true
+        );
+        return;
+    }
+
+    map.setView([lat, lng], Math.max(map.getZoom(), 12));
+    setStatus(`Moved to ${lat.toFixed(4)}, ${lng.toFixed(4)}.`);
+});
+
+
+/* =========================
+   Explorer / Experimental mode
+   ========================= */
+
+const modeTabs = document.querySelectorAll(".mode-tab");
+
+function getModeFromHash() {
+    return location.hash === "#experimental" ? "experimental" : "explorer";
+}
+
+function setMode(mode) {
+
+    document.body.dataset.mode = mode;
+
+    modeTabs.forEach((tab) => {
+        const active = tab.dataset.mode === mode;
+        tab.classList.toggle("is-active", active);
+
+        if (active) {
+            tab.setAttribute("aria-current", "page");
+        } else {
+            tab.removeAttribute("aria-current");
+        }
+    });
+
+    if (mode === "explorer") {
+        clearExperimental();
+        setStatus("Select a year and click View Year or Analyse Glacier.");
+    } else {
+        setStatus("Draw a rectangle or shape on the map to run the experimental analysis.");
+    }
+
+    resizeMaps();
+}
+
+// The tabs are links; the back button and shared links work too
+window.addEventListener("hashchange", () => setMode(getModeFromHash()));
 
 
 /* =========================
    Main controls
    ========================= */
 
-viewButton.addEventListener(
-    "click",
-    function () {
+viewButton.addEventListener("click", () => {
+    loadYear(yearSelect.value);
+});
 
-        const year =
-            Number(yearSelect.value);
+viewSecondYearButton.addEventListener("click", () => {
 
-        yearSlider.value =
-            year;
-
-        sliderYear.textContent =
-            year;
-
-        loadYear(
-            year,
-            false
-        );
+    if (!secondYearSelect.value) {
+        setStatus("Select a second year first.", true);
+        return;
     }
-);
 
+    loadSecondYear(secondYearSelect.value);
+});
 
-viewSecondYearButton.addEventListener(
-    "click",
-    function () {
-
-        loadSecondYear(
-            Number(secondYearSelect.value)
-        );
+secondYearSelect.addEventListener("change", () => {
+    if (!secondYearSelect.value) {
+        closeSecondMap();
     }
-);
+});
+
+analyseButton.addEventListener("click", async () => {
+
+    // Experimental Explorer: re-run on the drawn area
+    if (isExperimentalMode() && selectedStudyArea) {
+        runExperimentalAnalysis();
+        return;
+    }
+
+    await loadYear(yearSelect.value);
+
+    if (secondYearSelect.value) {
+        await loadSecondYear(secondYearSelect.value);
+    } else {
+        closeSecondMap();
+    }
+});
+
+yearSelect.addEventListener("change", () => {
+    yearSlider.value = yearSelect.value;
+    sliderYear.textContent = yearSelect.value;
+});
 
 
 /* =========================
    Timeline slider
    ========================= */
 
-yearSlider.addEventListener(
-    "input",
-    function () {
+function applySliderEnabled() {
+    yearSlider.disabled = !sliderEnabled.checked;
+    yearSlider
+        .closest(".timeline-section")
+        .classList.toggle("is-disabled", !sliderEnabled.checked);
+}
 
-        sliderYear.textContent =
-            yearSlider.value;
+sliderEnabled.addEventListener("change", applySliderEnabled);
+applySliderEnabled();
 
-        yearSelect.value =
-            yearSlider.value;
-    }
-);
+yearSlider.addEventListener("input", () => {
+    sliderYear.textContent = yearSlider.value;
+    yearSelect.value = yearSlider.value;
+});
 
+yearSlider.addEventListener("change", () => {
 
-yearSlider.addEventListener(
-    "change",
-    function () {
+    // Return to the single-map view while scrubbing
+    closeSecondMap();
+    secondYearSelect.value = "";
 
-        // Return to single-map Explorer view
-        secondMapContainer.hidden = true;
-        secondResultCard.hidden = true;
-
-        if (
-            secondOverlay &&
-            secondMap
-        ) {
-            secondMap.removeLayer(
-                secondOverlay
-            );
-
-            secondOverlay = null;
-        }
-
-        setTimeout(() => {
-            map.invalidateSize();
-        }, 100);
-
-        loadYear(
-            Number(yearSlider.value),
-            false
-        );
-    }
-);
-
-
-/* =========================
-   Year select
-   ========================= */
-
-yearSelect.addEventListener(
-    "change",
-    function () {
-
-        yearSlider.value =
-            yearSelect.value;
-
-        sliderYear.textContent =
-            yearSelect.value;
-    }
-);
+    loadYear(yearSlider.value);
+});
 
 
 /* =========================
    Glacier selection
    ========================= */
 
-glacierSelect.addEventListener(
-    "change",
-    async function () {
+glacierSelect.addEventListener("change", async () => {
 
-        /* Remove existing overlays */
+    const glacierId = getSelectedGlacier();
+    const glacier = glaciers[glacierId];
+    const glacierName = getSelectedGlacierName();
 
-        if (firstOverlay) {
-
-            map.removeLayer(
-                firstOverlay
-            );
-
-            firstOverlay = null;
-        }
-
-
-        if (
-            secondOverlay &&
-            secondMap
-        ) {
-
-            secondMap.removeLayer(
-                secondOverlay
-            );
-
-            secondOverlay = null;
-        }
-
-
-        if (dynamicOverlay) {
-
-            map.removeLayer(
-                dynamicOverlay
-            );
-
-            dynamicOverlay = null;
-        }
-
-
-        if (selectedStudyArea) {
-
-            map.removeLayer(
-                selectedStudyArea
-            );
-
-            selectedStudyArea = null;
-        }
-
-
-        /* Hide second comparison */
-
-        secondMapContainer.hidden =
-            true;
-
-        secondResultCard.hidden =
-            true;
-
-
-        /* Move to glacier */
-
-        moveToSelectedGlacier();
-
-
-        /* Reload selected year */
-
-        await loadYear(
-            Number(yearSelect.value),
-            false
-        );
-
-
-        setTimeout(() => {
-
-            map.invalidateSize();
-
-        }, 100);
+    if (firstOverlay) {
+        map.removeLayer(firstOverlay);
+        firstOverlay = null;
     }
-);
+
+    clearExperimental();
+
+    firstData = null;
+    resetCard("first");
+    closeSecondMap();
+    secondYearSelect.value = "";
+
+    glacierSubtitle.textContent = glacierName;
+    resultGlacierName.textContent = glacierName;
+
+    map.setView(glacier.centre, glacier.zoom);
+
+    updateAreaChart();
+
+    await loadYear(yearSelect.value);
+    preloadTimeline(glacierId);
+});
+
+
+/* =========================
+   Accessibility settings
+   ========================= */
+
+const A11Y_STORAGE_KEY = "glacier-explorer-a11y";
+
+const A11Y_CLASSES = {
+    largeText: "a11y-large-text",
+    highContrast: "a11y-high-contrast",
+    reduceMotion: "a11y-reduce-motion"
+};
+
+function loadA11ySettings() {
+    try {
+        return JSON.parse(localStorage.getItem(A11Y_STORAGE_KEY)) || {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function saveA11ySettings(settings) {
+    try {
+        localStorage.setItem(A11Y_STORAGE_KEY, JSON.stringify(settings));
+    } catch (error) {
+        // Storage unavailable (private window etc.) — settings last this visit only
+    }
+}
+
+function applyA11ySettings(settings) {
+
+    Object.entries(A11Y_CLASSES).forEach(([key, className]) => {
+        document.documentElement.classList.toggle(className, Boolean(settings[key]));
+    });
+
+    resizeMaps();
+
+    if (areaChart) {
+        areaChart.resize();
+    }
+}
+
+const a11ySettings = loadA11ySettings();
+
+a11yDialog.querySelectorAll("[data-a11y]").forEach((checkbox) => {
+
+    checkbox.checked = Boolean(a11ySettings[checkbox.dataset.a11y]);
+
+    checkbox.addEventListener("change", () => {
+        a11ySettings[checkbox.dataset.a11y] = checkbox.checked;
+        applyA11ySettings(a11ySettings);
+        saveA11ySettings(a11ySettings);
+    });
+});
+
+applyA11ySettings(a11ySettings);
+
+a11yButton.addEventListener("click", () => {
+    a11yDialog.showModal();
+});
 
 
 /* =========================
    Initial page load
    ========================= */
 
-sliderYear.textContent =
-    yearSelect.value;
+setMode(getModeFromHash());
 
-firstMapLabel.textContent =
-    yearSelect.value;
+glacierSubtitle.textContent = getSelectedGlacierName();
+resultGlacierName.textContent = getSelectedGlacierName();
 
-loadYear(
-    Number(yearSelect.value),
-    false
-);
+loadYear(yearSelect.value).then(() => {
+    preloadTimeline(getSelectedGlacier());
+});

@@ -4,13 +4,115 @@
 
 * { box-sizing: border-box; }
 
+html,
+body { height: 100%; }
+
 body {
     margin: 0;
     height: 100vh;
     display: flex;
+    flex-direction: column;
     font-family: Arial, sans-serif;
     background: #f5f6f7;
     color: #202124;
+
+    /* Only the sidebar scrolls on desktop, never the whole page */
+    overflow: hidden;
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Experimental-only UI appears on the Experimental Explorer page */
+body:not([data-mode="experimental"]) .experimental-only {
+    display: none !important;
+}
+
+/* =========================
+   Header
+   ========================= */
+
+.topbar {
+    flex-shrink: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    background: white;
+    border-bottom: 1px solid #e2e5e8;
+}
+
+.mode-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+}
+
+.mode-tab {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    height: 100%;
+    padding: 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    border-top: 3px solid transparent;
+}
+
+.mode-tab:hover { color: #202124; }
+
+.mode-tab.is-active {
+    color: #202124;
+    border-bottom-color: #202124;
+}
+
+.mode-tab:focus-visible {
+    outline: 2px solid #202124;
+    outline-offset: -4px;
+}
+
+.mode-icon {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #d5d9dd;
+    border-radius: 50%;
+}
+
+.mode-tab.is-active .mode-icon { border-color: #202124; }
+
+.mode-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mode-divider {
+    width: 1px;
+    height: 24px;
+    background: #e2e5e8;
+}
+
+/* =========================
+   Layout
+   ========================= */
+
+.layout {
+    flex: 1;
+    display: flex;
+    min-height: 0;
 }
 
 /* =========================
@@ -19,8 +121,10 @@ body {
 
 aside,
 .sidebar {
+    /* Keeps absolutely positioned children (e.g. hidden labels)
+       inside the sidebar instead of stretching the page */
+    position: relative;
     width: 340px;
-    height: 100vh;
     flex-shrink: 0;
     padding: 28px 24px;
     background: white;
@@ -35,7 +139,7 @@ h1 {
 }
 
 .glacier-subtitle {
-    margin: 0 0 28px;
+    margin: 0 0 8px;
     font-size: 14px;
     color: #6b7280;
 }
@@ -54,7 +158,8 @@ label {
 }
 
 select,
-button {
+button,
+.coord-search input {
     width: 100%;
     padding: 11px 12px;
     font: inherit;
@@ -82,24 +187,32 @@ button:disabled {
     cursor: wait;
 }
 
-/* Primary button */
+select:focus-visible,
+button:focus-visible,
+.coord-search input:focus-visible {
+    outline: 2px solid #202124;
+    outline-offset: 2px;
+}
 
-#view,
-#compare {
+/* Primary button: one main action per page */
+
+.analyse-button {
+    margin-top: 24px;
     background: #202124;
     color: white;
     border-color: #202124;
 }
 
-#view:hover,
-#compare:hover { background: #343639; }
+.analyse-button:hover {
+    background: #343639;
+    border-color: #343639;
+}
 
 /* =========================
    Timeline
    ========================= */
 
-.timeline-section,
-.timeline-container {
+.timeline-section {
     margin-top: 20px;
     padding: 16px;
     background: #f7f9fb;
@@ -117,7 +230,28 @@ button:disabled {
     color: #444;
 }
 
-.timeline-current-year,
+.timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.slider-toggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #777;
+    cursor: pointer;
+}
+
+.slider-toggle input {
+    margin: 0;
+    accent-color: #202124;
+}
+
 #sliderYear {
     padding: 4px 9px;
     background: #202124;
@@ -126,8 +260,7 @@ button:disabled {
     font-size: 12px;
 }
 
-#yearSlider,
-.year-slider {
+#yearSlider {
     width: 100%;
     height: 5px;
     margin: 12px 0 5px;
@@ -139,8 +272,7 @@ button:disabled {
     cursor: pointer;
 }
 
-#yearSlider::-webkit-slider-thumb,
-.year-slider::-webkit-slider-thumb {
+#yearSlider::-webkit-slider-thumb {
     width: 18px;
     height: 18px;
     appearance: none;
@@ -152,11 +284,9 @@ button:disabled {
     cursor: grab;
 }
 
-#yearSlider::-webkit-slider-thumb:active,
-.year-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+#yearSlider::-webkit-slider-thumb:active { cursor: grabbing; }
 
-#yearSlider::-moz-range-thumb,
-.year-slider::-moz-range-thumb {
+#yearSlider::-moz-range-thumb {
     width: 12px;
     height: 12px;
     background: white;
@@ -165,7 +295,19 @@ button:disabled {
     cursor: grab;
 }
 
-.timeline-labels,
+#yearSlider:focus-visible {
+    outline: 2px solid #202124;
+    outline-offset: 6px;
+}
+
+.timeline-section.is-disabled #yearSlider,
+.timeline-section.is-disabled #sliderYear,
+.timeline-section.is-disabled .timeline-years {
+    opacity: 0.4;
+}
+
+.timeline-section.is-disabled #yearSlider { cursor: not-allowed; }
+
 .timeline-years {
     display: flex;
     justify-content: space-between;
@@ -176,10 +318,12 @@ button:disabled {
 }
 
 /* =========================
-   Select year section
+   Select year / second year
    ========================= */
 
-.comparison-section {
+.comparison-section,
+.second-year-section,
+.experimental-section {
     margin-top: 24px;
     padding-top: 22px;
     border-top: 1px solid #e2e5e8;
@@ -197,27 +341,17 @@ button:disabled {
     color: #73777c;
 }
 
-.comparison-years {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-.comparison-years label { margin-top: 0; }
-
-/* =========================
-   Second year section
-   ========================= */
-
-.second-year-section {
-    margin-top: 24px;
-    padding-top: 22px;
-    border-top: 1px solid #e2e5e8;
-}
+.comparison-section label,
+.second-year-section label { margin-top: 0; }
 
 .section-heading h3 {
     margin: 0 0 5px;
     font-size: 15px;
+}
+
+.section-heading h3 span {
+    font-weight: 400;
+    color: #73777c;
 }
 
 .section-heading p {
@@ -227,8 +361,97 @@ button:disabled {
     color: #73777c;
 }
 
-.second-year-section label { margin-top: 0; }
 #viewSecondYear { margin-top: 10px; }
+
+/* =========================
+   Experimental analysis
+   ========================= */
+
+.experimental-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.experimental-heading h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.experimental-badge {
+    padding: 4px 7px;
+    background: #f3f4f6;
+    border: 1px solid #d5d9dd;
+    border-radius: 12px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.experimental-description {
+    margin: 0 0 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #73777c;
+}
+
+.coord-search {
+    display: flex;
+    gap: 8px;
+}
+
+.coord-search input { min-width: 0; }
+
+.coord-search button {
+    width: auto;
+    margin-top: 0;
+    flex-shrink: 0;
+}
+
+.experimental-result {
+    margin: 12px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* =========================
+   Status / warnings / notes
+   ========================= */
+
+#status {
+    margin: 14px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #666;
+    overflow-wrap: anywhere;
+}
+
+.error { color: #b42318 !important; }
+
+#warning,
+.experimental-warning {
+    margin-top: 12px;
+    padding: 10px;
+    background: #fff8e6;
+    border-left: 3px solid #d6a323;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.note {
+    margin: 20px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid #e2e5e8;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #777;
+}
+
+.a11y-button { margin-top: 16px; }
 
 /* =========================
    Results
@@ -241,9 +464,15 @@ button:disabled {
 }
 
 .results-section > h3 {
-    margin: 0 0 18px;
+    margin: 0 0 6px;
     font-size: 20px;
     line-height: 1.2;
+}
+
+.result-glacier {
+    margin: 0 0 16px;
+    font-size: 13px;
+    color: #444;
 }
 
 .comparison-results {
@@ -275,11 +504,11 @@ button:disabled {
     font-size: 14px;
 }
 
-.result-area,
-#area {
+.result-card .result-area {
     margin: 0 0 12px;
     font-size: 24px;
     font-weight: 700;
+    color: #202124;
 }
 
 .result-card p {
@@ -298,136 +527,12 @@ button:disabled {
     border-top: 1px solid #e2e5e8;
 }
 
-/* Supports either heading markup:
-   <div class="area-chart-heading"> or
-   <div class="section-heading"> inside the chart section */
-
-.area-chart-heading,
-.area-chart-section .section-heading {
-    margin: 0 0 12px;
-}
-
-.area-chart-heading h3,
-.area-chart-section .section-heading h3 {
-    margin: 0 0 5px;
-    font-size: 16px;
-    line-height: 1.25;
-}
-
-.area-chart-heading p,
-.area-chart-section .section-heading p {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.4;
-    color: #73777c;
-}
+.area-chart-section .section-heading p { margin-bottom: 12px; }
 
 .area-chart-wrapper {
     position: relative;
     width: 100%;
     height: 180px;
-    margin: 0;
-}
-
-/* =========================
-   Comparison summary
-   ========================= */
-
-.change-summary {
-    margin-top: 10px;
-    padding: 12px;
-    text-align: center;
-    background: #f7f9fb;
-    border: 1px solid #e1e5e9;
-    border-radius: 8px;
-}
-
-.change-summary strong {
-    display: block;
-    margin-top: 3px;
-    font-size: 18px;
-}
-
-/* =========================
-   Experimental dynamic analysis
-   ========================= */
-
-.experimental-section {
-    margin-top: 24px;
-    padding-top: 22px;
-    border-top: 1px solid #e2e5e8;
-}
-
-.experimental-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.experimental-heading h3 {
-    margin: 0;
-    font-size: 20px;
-}
-
-.experimental-badge {
-    padding: 4px 7px;
-    background: #f3f4f6;
-    border: 1px solid #d5d9dd;
-    border-radius: 12px;
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-}
-
-.experimental-description {
-    margin: 0 0 10px;
-    font-size: 12px;
-    line-height: 1.45;
-    color: #73777c;
-}
-
-/* =========================
-   Status / warnings / notes
-   ========================= */
-
-#status {
-    margin: 14px 0 0;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #666;
-    overflow-wrap: anywhere;
-}
-
-.error { color: #b42318 !important; }
-
-/* Shared yellow warning style */
-#warning,
-.experimental-warning {
-    margin-top: 12px;
-    padding: 10px;
-    background: #fff8e6;
-    border-left: 3px solid #d6a323;
-    border-radius: 4px;
-    font-size: 11px;
-    line-height: 1.5;
-}
-
-.note {
-    margin: 20px 0 0;
-    padding-top: 18px;
-    border-top: 1px solid #e2e5e8;
-    font-size: 11px;
-    line-height: 1.5;
-    color: #777;
-}
-
-hr {
-    margin: 22px 0;
-    border: 0;
-    border-top: 1px solid #e2e5e8;
 }
 
 /* =========================
@@ -438,32 +543,23 @@ hr {
     display: flex;
     flex: 1;
     min-width: 0;
-    height: 100vh;
 }
 
-#map {
-    width: 100%;
-    height: 100%;
-}
-
-#first-map-container {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-}
-
+#first-map-container,
 #second-map-container {
     position: relative;
     flex: 1;
     min-width: 0;
-    height: 100%;
-    border-left: 3px solid #202124;
 }
 
+#second-map-container { border-left: 3px solid #202124; }
+
+#second-map-container[hidden] { display: none; }
+
+#map,
 #secondMap {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
 }
 
 #first-map-label,
@@ -490,22 +586,221 @@ hr {
 
 .leaflet-bar a { border-color: #eee !important; }
 
+/* Our map buttons (satellite + drawing tools) match the zoom buttons */
+
+.leaflet-bar .map-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin: 0;
+    padding: 7px;
+    color: #202124;
+    background: white;
+    border: none;
+    border-bottom: 1px solid #eee;
+    border-radius: 0;
+}
+
+.leaflet-bar .map-btn:first-child {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+.leaflet-bar .map-btn:last-child {
+    border-bottom: none;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.leaflet-bar .map-btn:hover { background: #f4f4f4; }
+
+.leaflet-bar .map-btn.is-active {
+    color: white;
+    background: #202124;
+}
+
+.map-btn svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Satellite button while the street map is showing */
+.satellite-btn[aria-pressed="false"] { color: #9aa0a6 !important; }
+
+/* =========================
+   Legend
+   ========================= */
+
+.map-legend {
+    position: absolute;
+    left: 10px;
+    bottom: 22px;
+    z-index: 1000;
+    padding: 10px 12px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-size: 11px;
+    color: #444;
+}
+
+.legend-title {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: #202124;
+}
+
+.legend-list {
+    display: grid;
+    gap: 6px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+body[data-mode="experimental"] .legend-list {
+    grid-template-columns: repeat(2, auto);
+}
+
+.legend-list li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.legend-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #202124;
+}
+
+.legend-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.legend-swatch {
+    width: 16px;
+    height: 11px;
+    flex-shrink: 0;
+    background: #d9443a;
+    opacity: 0.85;
+    border-radius: 2px;
+}
+
+.legend-swatch--experimental { background: #ffff00; outline: 1px solid #d6c800; }
+
+/* =========================
+   Accessibility settings
+   ========================= */
+
+dialog {
+    width: calc(100% - 32px);
+    max-width: 320px;
+    padding: 20px 22px;
+    color: #202124;
+    border: 1px solid #e2e5e8;
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+dialog::backdrop { background: rgba(0, 0, 0, 0.3); }
+
+dialog h3 {
+    margin: 0 0 8px;
+    font-size: 18px;
+}
+
+.check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 9px 0;
+    font-size: 14px;
+    font-weight: 400;
+    color: #202124;
+    cursor: pointer;
+}
+
+.check-row input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: #202124;
+}
+
+html.a11y-large-text aside,
+html.a11y-large-text .topbar,
+html.a11y-large-text .map-legend { zoom: 1.15; }
+
+html.a11y-high-contrast .glacier-subtitle,
+html.a11y-high-contrast .comparison-description,
+html.a11y-high-contrast .section-heading p,
+html.a11y-high-contrast .experimental-description,
+html.a11y-high-contrast .result-label,
+html.a11y-high-contrast .result-card p,
+html.a11y-high-contrast .timeline-years,
+html.a11y-high-contrast #status,
+html.a11y-high-contrast .note,
+html.a11y-high-contrast label {
+    color: #000;
+}
+
+html.a11y-high-contrast select,
+html.a11y-high-contrast button,
+html.a11y-high-contrast .result-card,
+html.a11y-high-contrast .timeline-section,
+html.a11y-high-contrast .coord-search input {
+    border-color: #000;
+}
+
+html.a11y-reduce-motion *,
+html.a11y-reduce-motion *::before,
+html.a11y-reduce-motion *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
 /* =========================
    Responsive (keep last)
    ========================= */
 
 @media (max-width: 750px) {
-    body { flex-direction: column; }
+
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+    }
+
+    .topbar { padding: 0 6px; }
+
+    .mode-tab {
+        gap: 6px;
+        padding: 0 6px;
+        font-size: 12px;
+    }
+
+    .layout { flex-direction: column; }
 
     aside,
     .sidebar {
         width: 100%;
-        height: auto;
-        max-height: 55vh;
         border-right: 0;
         border-bottom: 1px solid #e2e5e8;
     }
 
-    #map-container { height: 45vh; }
-    #map { min-height: 45vh; }
+    #map-container {
+        flex: none;
+        height: 70vh;
+    }
+
+    body[data-mode="experimental"] .legend-list {
+        grid-template-columns: 1fr;
+    }
 }

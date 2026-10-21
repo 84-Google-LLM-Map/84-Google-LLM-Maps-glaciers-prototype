@@ -170,7 +170,7 @@ def calculate_glacier(year):
         raise ValueError("Earth Engine returned an invalid area value.")
 
     map_info = glacier_like.getMapId(
-        {"min": 1, "max": 1, "palette": ["00FFFF"]}
+        {"min": 1, "max": 1, "palette": ["D9443A"]}
     )
     return {
         # Existing Rob Roy API fields are preserved.

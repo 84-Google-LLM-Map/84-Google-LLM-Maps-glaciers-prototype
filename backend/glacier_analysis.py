@@ -267,7 +267,7 @@ def calculate_glacier(glacier_id, year):
     map_info = glacier_like.getMapId({
         "min": 1,
         "max": 1,
-        "palette": ["00FFFF"]
+        "palette": ["D9443A"]
     })
 
     return {
