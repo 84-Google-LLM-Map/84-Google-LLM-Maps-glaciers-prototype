@@ -1,6 +1,10 @@
 import ee
 
-from glaciers import get_glacier
+from glaciers import (
+    get_glacier,
+    get_study_area,
+    get_reference_geometry,
+)
 
 
 # ---------------------------------------------------------
@@ -21,11 +25,129 @@ SIMILARITY_THRESHOLD = 0.80
 GLACIER_SIMILARITY_THRESHOLD = 0.80
 SCALE = 10
 
+# Glacier whose manual polygons are used when no glacier
+# is specified (keeps the original Rob Roy behaviour).
+DEFAULT_GLACIER_ID = "rob-roy"
+
 EMBEDDINGS = ee.ImageCollection(
     "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL"
 )
 
 BANDS = [f"A{i:02d}" for i in range(64)]
+
+
+# ---------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------
+
+def sum_area_km2(mask, geometry, scale=SCALE):
+    """
+    Sum the area (km²) of the pixels in `mask` inside `geometry`.
+    Returns an ee.Number (0 if no pixels).
+    """
+
+    result = (
+        ee.Image.pixelArea()
+        .divide(1e6)
+        .rename("area")
+        .updateMask(mask)
+        .reduceRegion(
+            reducer=ee.Reducer.sum(),
+            geometry=geometry,
+            scale=scale,
+            maxPixels=1e9,
+            tileScale=4
+        )
+    )
+
+    return ee.Number(
+        ee.Algorithms.If(
+            result.contains("area"),
+            result.get("area"),
+            0
+        )
+    )
+
+
+def normalise(reference_image):
+    """
+    Scale a 64-band constant image to unit length so that a
+    dot product with an embedding gives cosine similarity.
+    """
+
+    magnitude = (
+        reference_image
+        .pow(2)
+        .reduce(ee.Reducer.sum())
+        .sqrt()
+    )
+
+    return reference_image.divide(magnitude)
+
+
+# ---------------------------------------------------------
+# LOCATION-DEPENDENT SETTINGS (HEMISPHERE)
+# ---------------------------------------------------------
+#
+# Glacier ice is easiest to separate from seasonal snow at the
+# end of the local summer, and survives best on slopes facing
+# away from the sun (poleward):
+#
+#   Southern hemisphere: Dec–Feb, south-facing (135–225°)
+#   Northern hemisphere: Jul–Sep, north-facing (315–45°)
+#
+# The southern values are the original Rob Roy settings,
+# so Rob Roy / Franz Josef results do not change.
+
+HEMISPHERE_SETTINGS = {
+    "south": {
+        "start": "2017-12-01",
+        "end": "2018-03-01",
+        "aspectMinimum": 135,
+        "aspectMaximum": 225,
+    },
+    "north": {
+        "start": "2017-07-01",
+        "end": "2017-10-01",
+        "aspectMinimum": 315,
+        "aspectMaximum": 45,
+    },
+}
+
+
+def get_location_settings(study_area):
+    """
+    Pick the season and shaded aspect for a study area from
+    the latitude of its centre.
+    """
+
+    latitude = ee.Number(
+        study_area.centroid(maxError=1).coordinates().get(1)
+    ).getInfo()
+
+    hemisphere = "north" if latitude >= 0 else "south"
+
+    return {
+        "hemisphere": hemisphere,
+        "latitude": latitude,
+        **HEMISPHERE_SETTINGS[hemisphere],
+    }
+
+
+def shaded_aspect_mask(aspect, settings):
+    """
+    1 where the slope faces poleward (away from the sun).
+    Aspect: 0 = north, 90 = east, 180 = south, 270 = west.
+    """
+
+    low = settings["aspectMinimum"]
+    high = settings["aspectMaximum"]
+
+    if low <= high:
+        return aspect.gte(low).And(aspect.lte(high))
+
+    # Range wraps through 0° (north), e.g. 315–45
+    return aspect.gte(low).Or(aspect.lte(high))
 
 
 # ---------------------------------------------------------
@@ -46,22 +168,11 @@ def get_embedding(year, study_area):
         .clip(study_area)
     )
 
-# ---------------------------------------------------------
-# GET EMBEDDING FOR A DYNAMIC STUDY AREA
-# ---------------------------------------------------------
 
-def get_dynamic_embedding(year, study_area):
-    start = ee.Date.fromYMD(year, 1, 1)
-    end = start.advance(1, "year")
+# The dynamic version used to be a copy of get_embedding.
+# Kept as an alias so existing calls still work.
+get_dynamic_embedding = get_embedding
 
-    return (
-        EMBEDDINGS
-        .filterDate(start, end)
-        .filterBounds(study_area)
-        .mosaic()
-        .select(BANDS)
-        .clip(study_area)
-    )
 
 # ---------------------------------------------------------
 # CREATE FIXED 2017 GLACIER REFERENCE
@@ -92,15 +203,19 @@ def create_reference(study_area, snow_reference):
         .rename(BANDS)
     )
 
-    # Normalise reference vector
-    magnitude = (
-        reference_image
-        .pow(2)
-        .reduce(ee.Reducer.sum())
-        .sqrt()
-    )
+    return normalise(reference_image)
 
-    return reference_image.divide(magnitude)
+
+def create_manual_reference(glacier_id=DEFAULT_GLACIER_ID):
+    """
+    Build the manual (hand-drawn polygon) 2017 reference for a
+    glacier from its configuration in glaciers.py.
+    """
+
+    return create_reference(
+        get_study_area(glacier_id),
+        get_reference_geometry(glacier_id)
+    )
 
 
 # ---------------------------------------------------------
@@ -109,49 +224,24 @@ def create_reference(study_area, snow_reference):
 
 def calculate_glacier(glacier_id, year):
 
-    # -----------------------------------------------------
-    # GET SELECTED GLACIER
-    # -----------------------------------------------------
-
     glacier = get_glacier(glacier_id)
 
-    centre = ee.Geometry.Point(
-        glacier["centre"]
-    )
+    study_area = get_study_area(glacier_id)
+    snow_reference = get_reference_geometry(glacier_id)
 
-    study_area = centre.buffer(
-        glacier["study_radius_m"]
-    )
-
-    snow_reference = ee.Geometry.MultiPolygon(
-        glacier["reference_polygons"]
-    )
-
-
-    # -----------------------------------------------------
-    # CREATE FIXED 2017 REFERENCE
-    # -----------------------------------------------------
-
+    # Fixed 2017 reference
     reference = create_reference(
         study_area,
         snow_reference
     )
 
-
-    # -----------------------------------------------------
-    # GET SELECTED YEAR
-    # -----------------------------------------------------
-
+    # Selected year
     embedding = get_embedding(
         year,
         study_area
     )
 
-
-    # -----------------------------------------------------
-    # SIMILARITY
-    # -----------------------------------------------------
-
+    # Similarity
     similarity = (
         embedding
         .multiply(reference)
@@ -159,11 +249,7 @@ def calculate_glacier(glacier_id, year):
         .rename("glacier_similarity")
     )
 
-
-    # -----------------------------------------------------
-    # GLACIER-LIKE MASK
-    # -----------------------------------------------------
-
+    # Glacier-like mask
     glacier_mask = similarity.gte(
         SIMILARITY_THRESHOLD
     )
@@ -174,49 +260,15 @@ def calculate_glacier(glacier_id, year):
         .rename("glacier_like")
     )
 
+    # Area
+    area = sum_area_km2(glacier_mask, study_area)
 
-    # -----------------------------------------------------
-    # CALCULATE AREA
-    # -----------------------------------------------------
-
-    area_image = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(glacier_mask)
-    )
-
-    area_result = area_image.reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=study_area,
-        scale=SCALE,
-        maxPixels=1e9,
-        tileScale=4
-    )
-
-    area = ee.Number(
-        ee.Algorithms.If(
-            area_result.contains("area"),
-            area_result.get("area"),
-            0
-        )
-    )
-
-
-    # -----------------------------------------------------
-    # CREATE MAP TILE
-    # -----------------------------------------------------
-
+    # Map tile
     map_info = glacier_like.getMapId({
         "min": 1,
         "max": 1,
         "palette": ["00FFFF"]
     })
-
-
-    # -----------------------------------------------------
-    # RETURN RESULT
-    # -----------------------------------------------------
 
     return {
         "glacierId": glacier_id,
@@ -231,23 +283,27 @@ def calculate_glacier(glacier_id, year):
         "tileUrl": map_info["tile_fetcher"].url_format
     }
 
+
 # ---------------------------------------------------------
 # RUN DYNAMIC GLACIER ANALYSIS
+# (user-drawn study area, manual reference)
 # ---------------------------------------------------------
 
-def calculate_dynamic_glacier(year, study_area):
+def calculate_dynamic_glacier(
+    year,
+    study_area,
+    glacier_id=DEFAULT_GLACIER_ID
+):
 
-    # Keep the existing manually selected
-    # Rob Roy 2017 glacier reference
-    reference = create_reference()
+    # Manual 2017 reference from the selected glacier's polygons
+    reference = create_manual_reference(glacier_id)
 
     # Use the user's drawn polygon as the study area
-    embedding = get_dynamic_embedding(
+    embedding = get_embedding(
         year,
         study_area
     )
 
-    # Similarity with fixed 2017 glacier reference
     similarity = (
         embedding
         .multiply(reference)
@@ -255,7 +311,6 @@ def calculate_dynamic_glacier(year, study_area):
         .rename("glacier_similarity")
     )
 
-    # >= 0.80 = glacier-like
     glacier_mask = similarity.gte(
         SIMILARITY_THRESHOLD
     )
@@ -266,36 +321,7 @@ def calculate_dynamic_glacier(year, study_area):
         .rename("glacier_like")
     )
 
-    # -----------------------------------------------------
-    # CALCULATE AREA
-    # -----------------------------------------------------
-
-    area_image = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(glacier_mask)
-    )
-
-    area_result = area_image.reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=study_area,
-        scale=SCALE,
-        maxPixels=1e9,
-        tileScale=4
-    )
-
-    area = ee.Number(
-        ee.Algorithms.If(
-            area_result.contains("area"),
-            area_result.get("area"),
-            0
-        )
-    )
-
-    # -----------------------------------------------------
-    # CREATE MAP TILE
-    # -----------------------------------------------------
+    area = sum_area_km2(glacier_mask, study_area)
 
     map_info = glacier_like.getMapId({
         "min": 1,
@@ -304,6 +330,7 @@ def calculate_dynamic_glacier(year, study_area):
     })
 
     return {
+        "glacierId": glacier_id,
         "year": year,
         "referenceYear": REFERENCE_YEAR,
         "threshold": SIMILARITY_THRESHOLD,
@@ -311,15 +338,26 @@ def calculate_dynamic_glacier(year, study_area):
         "tileUrl": map_info["tile_fetcher"].url_format
     }
 
+
 # ---------------------------------------------------------
 # DYNAMIC REFERENCE CANDIDATES - VERSION 1
+# (diagnostic: compares automatic candidates against the
+#  manual reference polygons of the selected glacier)
 # ---------------------------------------------------------
 
-def get_dynamic_reference_candidates(study_area):
+def get_dynamic_reference_candidates(
+    study_area,
+    glacier_id=DEFAULT_GLACIER_ID
+):
 
-    # Rob Roy summer following the 2017 reference year
-    start = "2017-12-01"
-    end = "2018-03-01"
+    # Manual reference polygons for the selected glacier
+    # (previously the undefined global SNOW_REFERENCE).
+    snow_reference = get_reference_geometry(glacier_id)
+
+    # End of local summer for the 2017 reference year
+    settings = get_location_settings(study_area)
+    start = settings["start"]
+    end = settings["end"]
 
     # Dynamic World is derived from Sentinel-2 and provides
     # a probability for the snow_and_ice class.
@@ -330,24 +368,18 @@ def get_dynamic_reference_candidates(study_area):
         .select("snow_and_ice")
     )
 
-    # For every Dynamic World observation:
-    # 1 = high-confidence snow/ice
-    # 0 = not high-confidence snow/ice
+    # 1 = high-confidence snow/ice, 0 = not
     high_confidence_snow = dynamic_world.map(
         lambda image: image.gte(0.70)
     )
 
-    # Calculate the proportion of observations in which
-    # each pixel was high-confidence snow/ice.
+    # Proportion of observations in which each pixel was
+    # high-confidence snow/ice.
     snow_persistence = (
         high_confidence_snow
         .mean()
         .clip(study_area)
     )
-
-    # -----------------------------------------------------
-    # DYNAMIC WORLD DIAGNOSTICS FOR MANUAL REFERENCE
-    # -----------------------------------------------------
 
     # Mean snow/ice probability across the summer period.
     mean_snow_probability = (
@@ -356,12 +388,7 @@ def get_dynamic_reference_candidates(study_area):
         .clip(study_area)
     )
 
-    # -----------------------------------------------------
-    # LOCAL MEAN-SUMMER SNOW PROBABILITY THRESHOLD
-    # -----------------------------------------------------
-
-    # Calculate the 75th percentile of mean summer snow/ice
-    # probability within the user's study area.
+    # Local P75 of mean summer snow/ice probability.
     snow_probability_stats = mean_snow_probability.reduceRegion(
         reducer=ee.Reducer.percentile([75]),
         geometry=study_area,
@@ -374,33 +401,26 @@ def get_dynamic_reference_candidates(study_area):
         snow_probability_stats.get("snow_and_ice")
     )
 
-    # Keep pixels in the upper 25% of local mean summer
-    # snow/ice probability.
     mean_snow_candidate_mask = (
         mean_snow_probability
         .gte(snow_probability_threshold)
     )
 
-    # -----------------------------------------------------
-    # MEAN SUMMER SNOW PROBABILITY DISTRIBUTION
-    # -----------------------------------------------------
-
+    # Probability distributions
     probability_percentiles = ee.Reducer.percentile([
         10, 25, 50, 75, 90
     ])
 
-    # Distribution inside Jasper's manual reference polygons.
     manual_probability_percentiles = (
         mean_snow_probability.reduceRegion(
             reducer=probability_percentiles,
-            geometry=SNOW_REFERENCE,
+            geometry=snow_reference,
             scale=10,
             maxPixels=1e9,
             tileScale=4
         )
     )
 
-    # Distribution across the whole user-drawn study area.
     study_area_probability_percentiles = (
         mean_snow_probability.reduceRegion(
             reducer=probability_percentiles,
@@ -411,41 +431,35 @@ def get_dynamic_reference_candidates(study_area):
         )
     )
 
-    # Check Dynamic World snow probability inside Jasper's
-    # manually selected reference polygons.
+    mean_max = ee.Reducer.mean().combine(
+        reducer2=ee.Reducer.max(),
+        sharedInputs=True
+    )
+
     manual_snow_probability_stats = (
         mean_snow_probability.reduceRegion(
-            reducer=ee.Reducer.mean().combine(
-                reducer2=ee.Reducer.max(),
-                sharedInputs=True
-            ),
-            geometry=SNOW_REFERENCE,
+            reducer=mean_max,
+            geometry=snow_reference,
             scale=10,
             maxPixels=1e9,
             tileScale=4
         )
     )
 
-    # Check persistence inside Jasper's manually selected
-    # reference polygons.
     manual_persistence_stats = (
         snow_persistence.reduceRegion(
-            reducer=ee.Reducer.mean().combine(
-                reducer2=ee.Reducer.max(),
-                sharedInputs=True
-            ),
-            geometry=SNOW_REFERENCE,
+            reducer=mean_max,
+            geometry=snow_reference,
             scale=10,
             maxPixels=1e9,
             tileScale=4
         )
     )
 
-    # Keep pixels that were high-confidence snow/ice
-    # in at least 60% of the summer observations.
+    # High-confidence snow/ice in at least 60% of observations
     persistent_snow_mask = snow_persistence.gte(0.60)
 
-    # Get elevation for the selected study area
+    # Elevation
     elevation = (
         ee.Image("USGS/SRTMGL1_003")
         .select("elevation")
@@ -464,33 +478,22 @@ def get_dynamic_reference_candidates(study_area):
         elevation_stats.get("elevation")
     )
 
-    # Calculate terrain aspect from the elevation data.
-    # Aspect is measured clockwise from north:
-    # 0 = north, 90 = east, 180 = south, 270 = west.
+    # Aspect: 0 = north, 90 = east, 180 = south, 270 = west.
+    # Keep poleward (shaded) slopes for this hemisphere.
     aspect = ee.Terrain.aspect(elevation)
 
-    # For the Rob Roy test, prefer south-facing terrain.
-    # 135-225 degrees = southeast through south to southwest.
-    south_facing = (
-        aspect
-        .gte(135)
-        .And(aspect.lte(225))
-    )
+    shaded_facing = shaded_aspect_mask(aspect, settings)
 
-    # Candidate mask after persistence + elevation,
-    # but BEFORE the aspect filter.
+    # Persistence + elevation, before aspect
     elevation_candidate_mask = (
         mean_snow_candidate_mask
         .And(elevation.gte(elevation_threshold))
     )
 
-    # Candidates must be persistent snow/ice,
-    # within the upper 30% of local elevation,
-    # AND south-facing.
+    # Persistence + elevation + aspect
     candidate_mask = (
-        mean_snow_candidate_mask
-        .And(elevation.gte(elevation_threshold))
-        .And(south_facing)
+        elevation_candidate_mask
+        .And(shaded_facing)
         .selfMask()
         .rename("reference_candidate")
     )
@@ -503,228 +506,62 @@ def get_dynamic_reference_candidates(study_area):
         tileScale=4
     )
 
-    print("Dynamic World images:", dynamic_world.size().getInfo())
-    print("Snow persistence stats:", persistence_stats.getInfo())
-    print("Elevation stats:", elevation_stats.getInfo())
-    print(
-        "70th percentile elevation:",
-        elevation_threshold.getInfo()
-    )
-
-    # Calculate candidate area for testing
-    candidate_area_image = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(candidate_mask)
-    )
-
-    area_result = candidate_area_image.reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=study_area,
-        scale=10,
-        maxPixels=1e9,
-        tileScale=4
-    )
-
-    candidate_area = ee.Number(
-        ee.Algorithms.If(
-            area_result.contains("area"),
-            area_result.get("area"),
-            0
-        )
-    )
-
-    # -----------------------------------------------------
-    # COMPARE AUTOMATIC CANDIDATES WITH MANUAL REFERENCE
-    # -----------------------------------------------------
-
-    # Total area of Jasper's manually selected reference polygons.
-    manual_area_image = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-    )
-
-    manual_area_result = manual_area_image.reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=SNOW_REFERENCE,
-        scale=10,
-        maxPixels=1e9,
-        tileScale=4
-    )
+    # Areas
+    candidate_area = sum_area_km2(candidate_mask, study_area)
 
     manual_area = ee.Number(
-        manual_area_result.get("area")
-    )
-
-    # 1. Persistence-only overlap.
-    persistence_overlap_result = (
         ee.Image.pixelArea()
         .divide(1e6)
         .rename("area")
-        .updateMask(persistent_snow_mask)
         .reduceRegion(
             reducer=ee.Reducer.sum(),
-            geometry=SNOW_REFERENCE,
+            geometry=snow_reference,
             scale=10,
             maxPixels=1e9,
             tileScale=4
         )
+        .get("area")
     )
 
-    persistence_overlap = ee.Number(
-        ee.Algorithms.If(
-            persistence_overlap_result.contains("area"),
-            persistence_overlap_result.get("area"),
-            0
+    def percent_of_manual(mask):
+        return (
+            sum_area_km2(mask, snow_reference)
+            .divide(manual_area)
+            .multiply(100)
         )
-    )
 
-    persistence_overlap_percent = (
-        persistence_overlap
-        .divide(manual_area)
-        .multiply(100)
-    )
+    overlap_area = sum_area_km2(candidate_mask, snow_reference)
 
-    # 2. Persistence + elevation overlap.
-    elevation_overlap_result = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(elevation_candidate_mask)
-        .reduceRegion(
-            reducer=ee.Reducer.sum(),
-            geometry=SNOW_REFERENCE,
-            scale=10,
-            maxPixels=1e9,
-            tileScale=4
-        )
-    )
+    persistence_overlap_percent = percent_of_manual(persistent_snow_mask)
+    elevation_overlap_percent = percent_of_manual(elevation_candidate_mask)
+    manual_overlap_percent = percent_of_manual(candidate_mask)
+    mean_snow_overlap_percent = percent_of_manual(mean_snow_candidate_mask)
 
-    elevation_overlap = ee.Number(
-        ee.Algorithms.If(
-            elevation_overlap_result.contains("area"),
-            elevation_overlap_result.get("area"),
-            0
-        )
-    )
+    # One round trip to Earth Engine instead of ~20
+    stats = ee.Dictionary({
+        "dynamicWorldImages": dynamic_world.size(),
+        "persistenceStats": persistence_stats,
+        "elevationStats": elevation_stats,
+        "manualSnowProbabilityStats": manual_snow_probability_stats,
+        "manualPersistenceStats": manual_persistence_stats,
+        "manualProbabilityPercentiles": manual_probability_percentiles,
+        "studyAreaProbabilityPercentiles": study_area_probability_percentiles,
 
-    elevation_overlap_percent = (
-        elevation_overlap
-        .divide(manual_area)
-        .multiply(100)
-    )
+        "candidateArea": candidate_area,
+        "minimumCandidateElevation": elevation_threshold,
+        "manualReferenceArea": manual_area,
+        "manualOverlapArea": overlap_area,
+        "manualReferenceCapturedPercent": manual_overlap_percent,
+        "persistenceManualOverlapPercent": persistence_overlap_percent,
+        "elevationManualOverlapPercent": elevation_overlap_percent,
+        "snowProbabilityThreshold": snow_probability_threshold,
+        "meanSnowManualOverlapPercent": mean_snow_overlap_percent,
+    }).getInfo()
 
-    # 3. Persistence + elevation + aspect overlap.
-    overlap_area_result = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(candidate_mask)
-        .reduceRegion(
-            reducer=ee.Reducer.sum(),
-            geometry=SNOW_REFERENCE,
-            scale=10,
-            maxPixels=1e9,
-            tileScale=4
-        )
-    )
+    print("Dynamic reference candidate diagnostics:", stats)
 
-    overlap_area = ee.Number(
-        ee.Algorithms.If(
-            overlap_area_result.contains("area"),
-            overlap_area_result.get("area"),
-            0
-        )
-    )
-
-    manual_overlap_percent = (
-        overlap_area
-        .divide(manual_area)
-        .multiply(100)
-    )
-
-    mean_snow_overlap_result = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(mean_snow_candidate_mask)
-        .reduceRegion(
-            reducer=ee.Reducer.sum(),
-            geometry=SNOW_REFERENCE,
-            scale=10,
-            maxPixels=1e9,
-            tileScale=4
-        )
-    )
-
-    mean_snow_overlap = ee.Number(
-        ee.Algorithms.If(
-            mean_snow_overlap_result.contains("area"),
-            mean_snow_overlap_result.get("area"),
-            0
-        )
-    )
-
-    mean_snow_overlap_percent = (
-        mean_snow_overlap
-        .divide(manual_area)
-        .multiply(100)
-    )
-
-    print("Manual reference area:", manual_area.getInfo())
-    print("Automatic/manual overlap area:", overlap_area.getInfo())
-    print(
-        "Persistence-only manual overlap:",
-        persistence_overlap_percent.getInfo(),
-        "%"
-    )
-    print(
-        "Persistence + elevation manual overlap:",
-        elevation_overlap_percent.getInfo(),
-        "%"
-    )
-    print(
-        "Persistence + elevation + aspect manual overlap:",
-        manual_overlap_percent.getInfo(),
-        "%"
-    )
-
-    print(
-        "Manual reference snow probability stats:",
-        manual_snow_probability_stats.getInfo()
-    )
-
-    print(
-        "Manual reference persistence stats:",
-        manual_persistence_stats.getInfo()
-    )
-
-    print(
-        "Manual reference probability percentiles:",
-        manual_probability_percentiles.getInfo()
-    )
-
-    print(
-        "Study area probability percentiles:",
-        study_area_probability_percentiles.getInfo()
-    )
-
-    print(
-        "Local P75 snow filter manual overlap:",
-        mean_snow_overlap_percent.getInfo(),
-        "%"
-    )
-
-    print(
-        "Local P75 snow threshold:",
-        snow_probability_threshold.getInfo()
-    )
-
-    # Yellow so we can distinguish this from:
-    # cyan = normal analysis
-    # magenta = dynamic study-area analysis
+    # Yellow, to distinguish from:
+    # cyan = normal analysis, magenta = dynamic study-area analysis
     map_info = candidate_mask.getMapId({
         "min": 1,
         "max": 1,
@@ -732,41 +569,58 @@ def get_dynamic_reference_candidates(study_area):
     })
 
     return {
-        "candidateArea": candidate_area.getInfo(),
+        "glacierId": glacier_id,
+        "candidateArea": stats["candidateArea"],
         "snowConfidenceThreshold": 0.70,
         "persistenceThreshold": 0.60,
         "elevationPercentile": 70,
-        "minimumCandidateElevation": elevation_threshold.getInfo(),
-        "aspectMinimum": 135,
-        "aspectMaximum": 225,
-        "manualReferenceArea": manual_area.getInfo(),
-        "manualOverlapArea": overlap_area.getInfo(),
-        "manualReferenceCapturedPercent": manual_overlap_percent.getInfo(),
-        "persistenceManualOverlapPercent": persistence_overlap_percent.getInfo(),
-        "elevationManualOverlapPercent": elevation_overlap_percent.getInfo(),
+        "minimumCandidateElevation": stats["minimumCandidateElevation"],
+        "hemisphere": settings["hemisphere"],
+        "aspectMinimum": settings["aspectMinimum"],
+        "aspectMaximum": settings["aspectMaximum"],
+        "manualReferenceArea": stats["manualReferenceArea"],
+        "manualOverlapArea": stats["manualOverlapArea"],
+        "manualReferenceCapturedPercent": stats["manualReferenceCapturedPercent"],
+        "persistenceManualOverlapPercent": stats["persistenceManualOverlapPercent"],
+        "elevationManualOverlapPercent": stats["elevationManualOverlapPercent"],
         "snowProbabilityPercentile": 75,
-        "snowProbabilityThreshold": snow_probability_threshold.getInfo(),
-        "meanSnowManualOverlapPercent": mean_snow_overlap_percent.getInfo(),
+        "snowProbabilityThreshold": stats["snowProbabilityThreshold"],
+        "meanSnowManualOverlapPercent": stats["meanSnowManualOverlapPercent"],
         "startDate": start,
         "endDate": end,
         "tileUrl": map_info["tile_fetcher"].url_format
     }
 
-def calculate_automatic_reference_glacier(year, study_area):
+
+# ---------------------------------------------------------
+# AUTOMATIC REFERENCE GLACIER ANALYSIS (EXPERIMENTAL)
+# ---------------------------------------------------------
+
+def calculate_automatic_reference_glacier(
+    year,
+    study_area,
+    glacier_id=DEFAULT_GLACIER_ID
+):
     """
     Experimental dynamic glacier analysis.
 
     Builds the 2017 Satellite Embedding reference automatically
-    from Dynamic World + elevation + aspect candidate pixels,
-    rather than Jasper's manual SNOW_REFERENCE polygons.
+    from Dynamic World + elevation + aspect candidate pixels
+    inside the user's drawn study area, instead of the manual
+    reference polygons.
+
+    The manual reference of `glacier_id` is only used for a
+    diagnostic similarity score between the two references.
     """
 
     # -----------------------------------------------------
-    # 1. BUILD AUTOMATIC REFERENCE CANDIDATES
+    # 1. AUTOMATIC REFERENCE CANDIDATES
     # -----------------------------------------------------
 
-    start = "2017-12-01"
-    end = "2018-03-01"
+    # End of local summer for the 2017 reference year
+    settings = get_location_settings(study_area)
+    start = settings["start"]
+    end = settings["end"]
 
     dynamic_world = (
         ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
@@ -775,14 +629,20 @@ def calculate_automatic_reference_glacier(year, study_area):
         .select("snow_and_ice")
     )
 
-    # Mean summer snow/ice probability.
+    if dynamic_world.size().getInfo() == 0:
+        return {
+            "error": (
+                "No Dynamic World imagery for the selected area "
+                f"between {start} and {end}."
+            )
+        }
+
     mean_snow_probability = (
         dynamic_world
         .mean()
         .clip(study_area)
     )
 
-    # Local P75 threshold.
     snow_probability_stats = mean_snow_probability.reduceRegion(
         reducer=ee.Reducer.percentile([75]),
         geometry=study_area,
@@ -828,33 +688,46 @@ def calculate_automatic_reference_glacier(year, study_area):
 
     aspect = ee.Terrain.aspect(elevation)
 
-    south_facing = (
-        aspect
-        .gte(135)
-        .And(aspect.lte(225))
-    )
+    shaded_facing = shaded_aspect_mask(aspect, settings)
 
     candidate_mask = (
         mean_snow_candidate_mask
         .And(elevation.gte(elevation_threshold))
-        .And(south_facing)
+        .And(shaded_facing)
     )
 
+    # Stop early if nothing passes the filters, otherwise the
+    # reference vector below is all nulls and Earth Engine errors.
+    candidate_area = sum_area_km2(
+        candidate_mask.selfMask(),
+        study_area
+    )
+
+    candidate_area_value = candidate_area.getInfo()
+
+    if candidate_area_value == 0:
+        return {
+            "error": (
+                "No reference candidate pixels found in the selected "
+                "area. Try drawing a larger area that includes "
+                "high-elevation snow or ice."
+            )
+        }
+
     # -----------------------------------------------------
-    # 4. BUILD AUTOMATIC 2017 EMBEDDING REFERENCE
+    # 4. AUTOMATIC 2017 EMBEDDING REFERENCE
     # -----------------------------------------------------
 
-    reference_embedding = get_dynamic_embedding(
+    reference_embedding = get_embedding(
         REFERENCE_YEAR,
         study_area
     )
 
-    # Only use pixels selected by the automatic method.
     candidate_embedding = reference_embedding.updateMask(
         candidate_mask
     )
 
-    # Mean 64-dimensional embedding across candidate pixels.
+    # Mean 64-dimensional embedding across candidate pixels
     reference_values = candidate_embedding.reduceRegion(
         reducer=ee.Reducer.mean(),
         geometry=study_area,
@@ -863,33 +736,19 @@ def calculate_automatic_reference_glacier(year, study_area):
         tileScale=4
     )
 
-    # Convert the 64 mean values back into an image.
     reference_image = ee.Image.constant([
         ee.Number(reference_values.get(band))
         for band in BANDS
     ]).rename(BANDS)
 
-    # Normalise the 64D reference vector.
-    reference_magnitude = (
-        reference_image
-        .pow(2)
-        .reduce(ee.Reducer.sum())
-        .sqrt()
-    )
-
-    normalised_reference = (
-        reference_image
-        .divide(reference_magnitude)
-    )
+    normalised_reference = normalise(reference_image)
 
     # -----------------------------------------------------
     # COMPARE AUTOMATIC REFERENCE WITH MANUAL REFERENCE
     # -----------------------------------------------------
 
-    # Build the existing Jasper/manual 2017 reference.
-    manual_reference = create_reference()
+    manual_reference = create_manual_reference(glacier_id)
 
-    # Compare the two normalised 64-dimensional vectors.
     reference_similarity = (
         normalised_reference
         .multiply(manual_reference)
@@ -897,8 +756,8 @@ def calculate_automatic_reference_glacier(year, study_area):
         .rename("reference_similarity")
     )
 
-    # The reference vectors are constant images, so sample
-    # the similarity at any point inside the study area.
+    # Both references are constant images, so any pixel
+    # in the study area gives the same value.
     reference_similarity_value = reference_similarity.reduceRegion(
         reducer=ee.Reducer.first(),
         geometry=study_area,
@@ -906,17 +765,11 @@ def calculate_automatic_reference_glacier(year, study_area):
         maxPixels=1e9
     ).get("reference_similarity")
 
-
-    print(
-        "Manual vs automatic reference similarity:",
-        ee.Number(reference_similarity_value).getInfo()
-    )
-
     # -----------------------------------------------------
     # 5. ANALYSE SELECTED YEAR
     # -----------------------------------------------------
 
-    analysis_embedding = get_dynamic_embedding(
+    analysis_embedding = get_embedding(
         year,
         study_area
     )
@@ -940,60 +793,26 @@ def calculate_automatic_reference_glacier(year, study_area):
     )
 
     # -----------------------------------------------------
-    # 6. CALCULATE AREA
+    # 6. AREA
     # -----------------------------------------------------
 
-    area_image = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(glacier_like_mask)
-    )
+    glacier_area = sum_area_km2(glacier_like_mask, study_area)
 
-    area_result = area_image.reduceRegion(
-        reducer=ee.Reducer.sum(),
-        geometry=study_area,
-        scale=SCALE,
-        maxPixels=1e9,
-        tileScale=4
-    )
+    # One round trip for the remaining numbers
+    stats = ee.Dictionary({
+        "area": glacier_area,
+        "manualAutomaticReferenceSimilarity": reference_similarity_value,
+        "snowProbabilityThreshold": snow_probability_threshold,
+        "minimumCandidateElevation": elevation_threshold,
+    }).getInfo()
 
-    glacier_area = ee.Number(
-        ee.Algorithms.If(
-            area_result.contains("area"),
-            area_result.get("area"),
-            0
-        )
+    print(
+        "Manual vs automatic reference similarity:",
+        stats["manualAutomaticReferenceSimilarity"]
     )
 
     # -----------------------------------------------------
-    # 7. CANDIDATE AREA
-    # -----------------------------------------------------
-
-    candidate_area_result = (
-        ee.Image.pixelArea()
-        .divide(1e6)
-        .rename("area")
-        .updateMask(candidate_mask)
-        .reduceRegion(
-            reducer=ee.Reducer.sum(),
-            geometry=study_area,
-            scale=10,
-            maxPixels=1e9,
-            tileScale=4
-        )
-    )
-
-    candidate_area = ee.Number(
-        ee.Algorithms.If(
-            candidate_area_result.contains("area"),
-            candidate_area_result.get("area"),
-            0
-        )
-    )
-
-    # -----------------------------------------------------
-    # 8. MAP
+    # 7. MAP
     # -----------------------------------------------------
 
     # Yellow = final experimental dynamic-analysis result
@@ -1004,26 +823,27 @@ def calculate_automatic_reference_glacier(year, study_area):
     })
 
     return {
+        "glacierId": glacier_id,
         "year": year,
         "referenceYear": REFERENCE_YEAR,
         "threshold": GLACIER_SIMILARITY_THRESHOLD,
 
-        "area": glacier_area.getInfo(),
+        "area": stats["area"],
 
         "referenceMethod": "automatic",
-        "candidateArea": candidate_area.getInfo(),
-        "manualAutomaticReferenceSimilarity": ee.Number(reference_similarity_value).getInfo(),
+        "candidateArea": candidate_area_value,
+        "manualAutomaticReferenceSimilarity":
+            stats["manualAutomaticReferenceSimilarity"],
 
         "snowProbabilityPercentile": 75,
-        "snowProbabilityThreshold":
-            snow_probability_threshold.getInfo(),
+        "snowProbabilityThreshold": stats["snowProbabilityThreshold"],
 
         "elevationPercentile": 70,
-        "minimumCandidateElevation":
-            elevation_threshold.getInfo(),
+        "minimumCandidateElevation": stats["minimumCandidateElevation"],
 
-        "aspectMinimum": 135,
-        "aspectMaximum": 225,
+        "hemisphere": settings["hemisphere"],
+        "aspectMinimum": settings["aspectMinimum"],
+        "aspectMaximum": settings["aspectMaximum"],
 
         "tileUrl": map_info["tile_fetcher"].url_format
     }
