@@ -2,21 +2,16 @@
    General
    ========================= */
 
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
     margin: 0;
     height: 100vh;
-
     display: flex;
-
     font-family: Arial, sans-serif;
     background: #f5f6f7;
     color: #202124;
 }
-
 
 /* =========================
    Sidebar
@@ -27,29 +22,23 @@ aside,
     width: 340px;
     height: 100vh;
     flex-shrink: 0;
-
     padding: 28px 24px;
-
     background: white;
     border-right: 1px solid #e2e5e8;
-
     overflow-y: auto;
 }
 
 h1 {
     margin: 0 0 6px;
-
     font-size: 30px;
     line-height: 1.1;
 }
 
 .glacier-subtitle {
     margin: 0 0 28px;
-
     font-size: 14px;
     color: #6b7280;
 }
-
 
 /* =========================
    Form controls
@@ -57,10 +46,8 @@ h1 {
 
 label {
     display: block;
-
     margin-top: 20px;
     margin-bottom: 7px;
-
     font-size: 13px;
     font-weight: 600;
     color: #444;
@@ -69,30 +56,20 @@ label {
 select,
 button {
     width: 100%;
-
     padding: 11px 12px;
-
     font: inherit;
-
     border: 1px solid #d5d9dd;
     border-radius: 7px;
-
     background: white;
 }
 
-select {
-    cursor: pointer;
-}
+select { cursor: pointer; }
 
 button {
     margin-top: 12px;
-
     font-weight: 600;
     cursor: pointer;
-
-    transition:
-        background 0.15s ease,
-        border-color 0.15s ease;
+    transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 button:hover {
@@ -105,10 +82,7 @@ button:disabled {
     cursor: wait;
 }
 
-
-/* =========================
-   Primary button
-   ========================= */
+/* Primary button */
 
 #view,
 #compare {
@@ -118,10 +92,7 @@ button:disabled {
 }
 
 #view:hover,
-#compare:hover {
-    background: #343639;
-}
-
+#compare:hover { background: #343639; }
 
 /* =========================
    Timeline
@@ -131,7 +102,6 @@ button:disabled {
 .timeline-container {
     margin-top: 20px;
     padding: 16px;
-
     background: #f7f9fb;
     border: 1px solid #e1e5e9;
     border-radius: 10px;
@@ -141,9 +111,7 @@ button:disabled {
     display: flex;
     justify-content: space-between;
     align-items: center;
-
     margin-bottom: 14px;
-
     font-size: 13px;
     font-weight: 600;
     color: #444;
@@ -152,324 +120,93 @@ button:disabled {
 .timeline-current-year,
 #sliderYear {
     padding: 4px 9px;
-
     background: #202124;
     color: white;
-
     border-radius: 12px;
-
     font-size: 12px;
 }
-
-
-/* Slider */
 
 #yearSlider,
 .year-slider {
     width: 100%;
     height: 5px;
-
     margin: 12px 0 5px;
-
     appearance: none;
     -webkit-appearance: none;
-
     background: #d5d9dd;
     border-radius: 10px;
-
     outline: none;
     cursor: pointer;
 }
-
-
-/* Chrome / Safari */
 
 #yearSlider::-webkit-slider-thumb,
 .year-slider::-webkit-slider-thumb {
     width: 18px;
     height: 18px;
-
     appearance: none;
     -webkit-appearance: none;
-
     background: white;
-
     border: 4px solid #202124;
     border-radius: 50%;
-
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
-
     cursor: grab;
 }
 
 #yearSlider::-webkit-slider-thumb:active,
-.year-slider::-webkit-slider-thumb:active {
-    cursor: grabbing;
-}
-
-
-/* Firefox */
+.year-slider::-webkit-slider-thumb:active { cursor: grabbing; }
 
 #yearSlider::-moz-range-thumb,
 .year-slider::-moz-range-thumb {
     width: 12px;
     height: 12px;
-
     background: white;
-
     border: 4px solid #202124;
     border-radius: 50%;
-
     cursor: grab;
 }
-
-
-/* Timeline labels */
 
 .timeline-labels,
 .timeline-years {
     display: flex;
     justify-content: space-between;
     align-items: center;
-
     margin-top: 8px;
-
     font-size: 11px;
     color: #777;
 }
 
-
 /* =========================
-   Comparison section
+   Select year section
    ========================= */
 
 .comparison-section {
     margin-top: 24px;
     padding-top: 22px;
-
     border-top: 1px solid #e2e5e8;
 }
 
 .comparison-title {
     margin: 0 0 4px;
-
     font-size: 16px;
 }
 
 .comparison-description {
     margin: 0 0 16px;
-
     font-size: 12px;
     line-height: 1.4;
-
     color: #73777c;
 }
-
-
-/* First year / second year */
 
 .comparison-years {
     display: grid;
     grid-template-columns: 1fr 1fr;
-
     gap: 10px;
 }
 
-.comparison-years label {
-    margin-top: 0;
-}
-
+.comparison-years label { margin-top: 0; }
 
 /* =========================
-   Results
-   ========================= */
-
-.results-section {
-    margin-top: 24px;
-    border-top: 1px solid #e2e5e8;
-}
-
-.comparison-results {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-
-    gap: 10px;
-    margin-top: 12px;
-    margin-bottom: 20px;
-}
-
-.result-card {
-    padding: 14px;
-
-    background: #f8f9fa;
-
-    border: 1px solid #e1e5e9;
-    border-radius: 9px;
-}
-
-.result-label {
-    display: block;
-
-    margin-bottom: 6px;
-
-    font-size: 10px;
-    font-weight: 700;
-
-    color: #74787d;
-
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.result-card h3 {
-    margin: 0 0 10px;
-
-    font-size: 14px;
-}
-
-.result-area,
-#area {
-    margin: 0 0 12px;
-
-    font-size: 24px;
-    font-weight: 700;
-}
-
-.result-card p {
-    margin: 5px 0;
-
-    font-size: 11px;
-    color: #666;
-}
-
-
-/* =========================
-   Comparison summary
-   ========================= */
-
-.change-summary {
-    margin-top: 10px;
-    padding: 12px;
-
-    text-align: center;
-
-    background: #f7f9fb;
-
-    border: 1px solid #e1e5e9;
-    border-radius: 8px;
-}
-
-.change-summary strong {
-    display: block;
-
-    margin-top: 3px;
-
-    font-size: 18px;
-}
-
-
-/* =========================
-   Status / warnings
-   ========================= */
-
-#status {
-    margin: 14px 0 0;
-
-    font-size: 12px;
-    line-height: 1.5;
-
-    color: #666;
-
-    overflow-wrap: anywhere;
-}
-
-.error {
-    color: #b42318 !important;
-}
-
-#warning {
-    margin-top: 12px;
-    padding: 10px;
-
-    background: #fff8e6;
-
-    border-left: 3px solid #d6a323;
-    border-radius: 4px;
-
-    font-size: 11px;
-    line-height: 1.5;
-}
-
-.note {
-    margin-top: 18px;
-
-    font-size: 11px;
-    line-height: 1.5;
-
-    color: #777;
-}
-
-hr {
-    margin: 22px 0;
-
-    border: 0;
-    border-top: 1px solid #e2e5e8;
-}
-
-
-/* =========================
-   Map
-   ========================= */
-
-/* #map {
-    flex: 1;
-    min-width: 0;
-    height: 100vh;
-
-    background: #ddd;
-} */
-
-
-/* Make Leaflet controls slightly softer */
-
-.leaflet-bar {
-    border: none !important;
-
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
-}
-
-.leaflet-bar a {
-    border-color: #eee !important;
-}
-
-
-/* =========================
-   Responsive
-   ========================= */
-
-@media (max-width: 750px) {
-
-    body {
-        flex-direction: column;
-    }
-
-    aside,
-    .sidebar {
-        width: 100%;
-        height: auto;
-        max-height: 55vh;
-
-        border-right: 0;
-        border-bottom: 1px solid #e2e5e8;
-    }
-
-    #map {
-        min-height: 45vh;
-    }
-}
-
-/* =========================
-   Second year comparison
+   Second year section
    ========================= */
 
 .second-year-section {
@@ -485,19 +222,220 @@ hr {
 
 .section-heading p {
     margin: 0 0 14px;
-
     font-size: 12px;
     line-height: 1.4;
     color: #73777c;
 }
 
-.second-year-section label {
-    margin-top: 0;
+.second-year-section label { margin-top: 0; }
+#viewSecondYear { margin-top: 10px; }
+
+/* =========================
+   Results
+   ========================= */
+
+.results-section {
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid #e2e5e8;
 }
+
+.results-section > h3 {
+    margin: 0 0 18px;
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.comparison-results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 0;
+}
+
+.result-card {
+    padding: 14px;
+    background: #f8f9fa;
+    border: 1px solid #e1e5e9;
+    border-radius: 9px;
+}
+
+.result-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #74787d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.result-card h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+}
+
+.result-area,
+#area {
+    margin: 0 0 12px;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.result-card p {
+    margin: 5px 0;
+    font-size: 11px;
+    color: #666;
+}
+
+/* =========================
+   Glacier area graph
+   ========================= */
+
+.area-chart-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e5e8;
+}
+
+/* Supports either heading markup:
+   <div class="area-chart-heading"> or
+   <div class="section-heading"> inside the chart section */
+
+.area-chart-heading,
+.area-chart-section .section-heading {
+    margin: 0 0 12px;
+}
+
+.area-chart-heading h3,
+.area-chart-section .section-heading h3 {
+    margin: 0 0 5px;
+    font-size: 16px;
+    line-height: 1.25;
+}
+
+.area-chart-heading p,
+.area-chart-section .section-heading p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #73777c;
+}
+
+.area-chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    margin: 0;
+}
+
+/* =========================
+   Comparison summary
+   ========================= */
+
+.change-summary {
+    margin-top: 10px;
+    padding: 12px;
+    text-align: center;
+    background: #f7f9fb;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+}
+
+.change-summary strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 18px;
+}
+
+/* =========================
+   Experimental dynamic analysis
+   ========================= */
+
+.experimental-section {
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid #e2e5e8;
+}
+
+.experimental-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.experimental-heading h3 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.experimental-badge {
+    padding: 4px 7px;
+    background: #f3f4f6;
+    border: 1px solid #d5d9dd;
+    border-radius: 12px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.experimental-description {
+    margin: 0 0 10px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #73777c;
+}
+
+/* =========================
+   Status / warnings / notes
+   ========================= */
+
+#status {
+    margin: 14px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #666;
+    overflow-wrap: anywhere;
+}
+
+.error { color: #b42318 !important; }
+
+/* Shared yellow warning style */
+#warning,
+.experimental-warning {
+    margin-top: 12px;
+    padding: 10px;
+    background: #fff8e6;
+    border-left: 3px solid #d6a323;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.note {
+    margin: 20px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid #e2e5e8;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #777;
+}
+
+hr {
+    margin: 22px 0;
+    border: 0;
+    border-top: 1px solid #e2e5e8;
+}
+
+/* =========================
+   Maps
+   ========================= */
 
 #map-container {
     display: flex;
-
     flex: 1;
     min-width: 0;
     height: 100vh;
@@ -510,23 +448,16 @@ hr {
 
 #first-map-container {
     position: relative;
-
     flex: 1;
     min-width: 0;
     height: 100%;
-}
-
-#viewSecondYear {
-    margin-top: 10px;
 }
 
 #second-map-container {
     position: relative;
-
     flex: 1;
     min-width: 0;
     height: 100%;
-
     border-left: 3px solid #202124;
 }
 
@@ -538,69 +469,43 @@ hr {
 #first-map-label,
 #second-map-label {
     position: absolute;
-
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
-
     z-index: 1001;
-
     padding: 6px 12px;
-
     background: white;
     border-radius: 5px;
-
     font-size: 16px;
     font-weight: 600;
-
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2);
 }
 
+/* Softer Leaflet controls */
+
+.leaflet-bar {
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-bar a { border-color: #eee !important; }
+
 /* =========================
-   Glacier Area Graph
+   Responsive (keep last)
    ========================= */
 
-.area-chart-section {
-    margin-top: 28px;
-    padding-top: 24px;
+@media (max-width: 750px) {
+    body { flex-direction: column; }
 
-    border-top: 1px solid #e2e5e8;
-}
+    aside,
+    .sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 55vh;
+        border-right: 0;
+        border-bottom: 1px solid #e2e5e8;
+    }
 
-.area-chart-section .section-heading {
-    margin-bottom: 18px;
-}
-
-.area-chart-section .section-heading h3 {
-    margin: 0 0 6px;
-
-    font-size: 18px;
-    line-height: 1.3;
-}
-
-.area-chart-section .section-heading p {
-    margin: 0;
-
-    font-size: 13px;
-    line-height: 1.4;
-    color: #666;
-}
-
-.area-chart-wrapper {
-    position: relative;
-
-    width: 100%;
-    height: 190px;
-    margin-top: 8px;
-}
-
-.note {
-    margin: 28px 0 0;
-    padding-top: 20px;
-
-    border-top: 1px solid #e2e5e8;
-
-    font-size: 13px;
-    line-height: 1.5;
-    color: #666;
+    #map-container { height: 45vh; }
+    #map { min-height: 45vh; }
 }

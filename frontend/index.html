@@ -5,18 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Glacier Explorer</title>
 
+  <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   >
 
-  <!-- Our styling -->
+  <!-- Leaflet-Geoman (drawing tools) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.0/dist/leaflet-geoman.css"
+  >
+
+  <!-- Our styling (after library CSS so it can override it) -->
   <link rel="stylesheet" href="style.css">
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Our JavaScript -->
+  <!-- Our JavaScript (defer = runs after the page, including the
+       Leaflet/Geoman scripts at the bottom of <body>, has loaded) -->
   <script src="app.js" defer></script>
 </head>
 
@@ -180,6 +188,27 @@
 
         </div>
 
+                <!-- Dynamic Analysis -->
+        <div class="experimental-section">
+
+            <div class="experimental-heading">
+                <h3>Dynamic Analysis</h3>
+                <span class="experimental-badge">Experimental</span>
+            </div>
+
+            <p class="experimental-description">
+                Draw a polygon or rectangle on the map to analyse glacier-like
+                area within a custom study region.
+            </p>
+
+            <div class="experimental-warning">
+                <strong>DEMO ONLY:</strong>
+                Automatic reference generation is experimental.
+                Glacier references are created programatically and are not
+                validated glacier measurements or evidence of glacier change.
+            </div>
+
+        </div>
     </div>
 
 
@@ -215,9 +244,14 @@
 
   </div>
 
+    <!-- Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Leaflet -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet Geoman -->
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.0/dist/leaflet-geoman.min.js"></script>
 
+    <!-- Our JavaScript -->
+    <script src="app.js"></script>
+    
 </body>
 </html>

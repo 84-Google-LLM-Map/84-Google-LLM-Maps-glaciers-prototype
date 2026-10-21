@@ -1,7 +1,10 @@
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory
+import ee
+
 from flask_cors import CORS
+from glacier_analysis import calculate_automatic_reference_glacier
 
 from glaciers import GLACIERS
 
@@ -128,6 +131,43 @@ def glacier(year):
         }), 500
 
 
+@app.route("/api/automatic-reference-analysis", methods=["POST"])
+def automatic_reference_analysis():
+    try:
+        data = request.get_json() or {}
+
+        geometry = data.get("geometry")
+        year = int(data.get("year", 2019))
+
+        if not geometry:
+            return jsonify({
+                "error": "No study area was provided."
+            }), 400
+
+        if not 2017 <= year <= 2024:
+            return jsonify({
+                "error": "Year must be between 2017 and 2024."
+            }), 400
+
+        study_area = ee.Geometry(geometry)
+
+        result = calculate_automatic_reference_glacier(
+            year,
+            study_area
+        )
+
+        return jsonify(result)
+
+    except Exception as exc:
+
+        app.logger.exception(
+            "Automatic reference analysis failed"
+        )
+
+        return jsonify({
+            "error": str(exc)
+        }), 500
+    
 if __name__ == "__main__":
     app.run(
         debug=True,

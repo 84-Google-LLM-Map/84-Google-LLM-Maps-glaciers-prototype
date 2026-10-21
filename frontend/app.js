@@ -1,7 +1,10 @@
-const API = "";
+const API = "http://localhost:5000";
 
 
-// Glacier locations
+/* =========================
+   Glacier configuration
+   ========================= */
+
 const glaciers = {
 
     "rob-roy": {
@@ -48,7 +51,10 @@ const glaciers = {
 };
 
 
-// Page elements
+/* =========================
+   Elements
+   ========================= */
+
 const glacierSelect = document.getElementById("glacier");
 
 const yearSelect = document.getElementById("year");
@@ -58,148 +64,208 @@ const yearSlider = document.getElementById("yearSlider");
 const sliderYear = document.getElementById("sliderYear");
 
 const viewButton = document.getElementById("view");
-const viewSecondYearButton = document.getElementById("viewSecondYear");
+const viewSecondYearButton =
+    document.getElementById("viewSecondYear");
 
 const status = document.getElementById("status");
 const warning = document.getElementById("warning");
 
-const resultsSection = document.getElementById("resultsSection");
+const resultsSection =
+    document.getElementById("resultsSection");
 
-const firstResultCard = document.getElementById("firstResultCard");
-const secondResultCard = document.getElementById("secondResultCard");
+const firstResultYear =
+    document.getElementById("firstResultYear");
 
-const firstResultYear = document.getElementById("firstResultYear");
-const firstArea = document.getElementById("firstArea");
-const firstReference = document.getElementById("firstReference");
-const firstThreshold = document.getElementById("firstThreshold");
+const firstArea =
+    document.getElementById("firstArea");
 
-const secondResultYear = document.getElementById("secondResultYear");
-const secondArea = document.getElementById("secondArea");
-const secondReference = document.getElementById("secondReference");
-const secondThreshold = document.getElementById("secondThreshold");
+const firstReference =
+    document.getElementById("firstReference");
 
-const firstMapLabel = document.getElementById("first-map-label");
-const secondMapLabel = document.getElementById("second-map-label");
-const secondMapContainer = document.getElementById("second-map-container");
+const firstThreshold =
+    document.getElementById("firstThreshold");
+
+const secondResultCard =
+    document.getElementById("secondResultCard");
+
+const secondResultYear =
+    document.getElementById("secondResultYear");
+
+const secondArea =
+    document.getElementById("secondArea");
+
+const secondReference =
+    document.getElementById("secondReference");
+
+const secondThreshold =
+    document.getElementById("secondThreshold");
+
+const firstMapLabel =
+    document.getElementById("first-map-label");
+
+const secondMapLabel =
+    document.getElementById("second-map-label");
+
+const secondMapContainer =
+    document.getElementById("second-map-container");
 
 let areaChart = null;
 
-// Cache
-const glacierCache = {};
+/* =========================
+   Populate year selectors
+   ========================= */
 
-
-// Year options
 for (let year = 2017; year <= 2024; year++) {
-    yearSelect.add(new Option(year, year));
-    secondYearSelect.add(new Option(year, year));
+
+    const option = document.createElement("option");
+
+    option.value = year;
+    option.textContent = year;
+
+    yearSelect.appendChild(option);
+
+
+    const secondOption =
+        document.createElement("option");
+
+    secondOption.value = year;
+    secondOption.textContent = year;
+
+    secondYearSelect.appendChild(secondOption);
 }
 
-// Default year
 yearSelect.value = "2019";
-
-secondYearSelect.insertBefore(
-    new Option("None", ""),
-    secondYearSelect.firstChild
-);
-
-secondYearSelect.value = "";
-
-yearSlider.value = "2019";
-sliderYear.textContent = "2019";
+secondYearSelect.value = "2024";
 
 
-// Main map
+/* =========================
+   Main map
+   ========================= */
+
 const map = L.map("map").setView(
     glaciers["rob-roy"].centre,
     glaciers["rob-roy"].zoom
 );
 
-let secondMap = null;
-let secondSatellite = null;
 
-const satellite = L.tileLayer(
+/* =========================
+   Base layers
+   ========================= */
+
+const satelliteLayer = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/" +
     "World_Imagery/MapServer/tile/{z}/{y}/{x}",
     {
-        attribution: "Tiles &copy; Esri",
-        maxZoom: 19
-    }
-).addTo(map);
-
-const streets = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 19
+        maxZoom: 19,
+        attribution:
+            "Tiles © Esri"
     }
 );
 
-L.control.layers({
-    Satellite: satellite,
-    Streets: streets
-}).addTo(map);
+const osmLayer = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    {
+        maxZoom: 19,
+        attribution:
+            "© OpenStreetMap contributors"
+    }
+);
+
+satelliteLayer.addTo(map);
+
+L.control.layers(
+    {
+        "Satellite": satelliteLayer,
+        "OpenStreetMap": osmLayer
+    }
+).addTo(map);
+
+
+/* =========================
+   Geoman drawing controls
+   ========================= */
+
+map.pm.addControls({
+    position: "topleft",
+
+    drawMarker: false,
+    drawCircleMarker: false,
+    drawPolyline: false,
+    drawCircle: false,
+
+    drawRectangle: true,
+    drawPolygon: true,
+
+    editMode: true,
+    dragMode: false,
+    cutPolygon: false,
+    removalMode: true
+});
+
+
+/* =========================
+   Map layers
+   ========================= */
 
 let firstOverlay = null;
 let secondOverlay = null;
 
+let secondMap = null;
+let secondSatelliteLayer = null;
 
-// Clear results
-function clearResult() {
 
-    if (firstOverlay) {
-        map.removeLayer(firstOverlay);
-        firstOverlay = null;
-    }
+/* =========================
+   Experimental analysis
+   ========================= */
 
-    if (secondOverlay && secondMap) {
-        secondMap.removeLayer(secondOverlay);
-        secondOverlay = null;
-    }
+let selectedStudyArea = null;
+let dynamicOverlay = null;
 
-    resultsSection.hidden = true;
 
-    firstResultCard.hidden = false;
-    secondResultCard.hidden = true;
+/* =========================
+   Get glacier
+   ========================= */
 
-    firstResultYear.textContent = "—";
-    firstArea.textContent = "—";
-    firstReference.textContent = "—";
-    firstThreshold.textContent = "—";
+function getSelectedGlacier() {
 
-    secondResultYear.textContent = "—";
-    secondArea.textContent = "—";
-    secondReference.textContent = "—";
-    secondThreshold.textContent = "—";
-
-    warning.hidden = true;
-    warning.textContent = "";
-
-    status.className = "";
+    return glacierSelect.value;
 }
 
 
-// Demo warning
-function showDemoWarning() {
+/* =========================
+   Move map to glacier
+   ========================= */
 
-    if (glacierSelect.value === "marmolada") {
-        warning.textContent =
-            "Demo only: Marmolada currently uses an artificial, " +
-            "unverified reference polygon. Results require Applied " +
-            "Science review and are not validated glacier measurements.";
+function moveToSelectedGlacier() {
 
-        warning.hidden = false;
+    const glacierId =
+        getSelectedGlacier();
+
+    const glacier =
+        glaciers[glacierId];
+
+    map.setView(
+        glacier.centre,
+        glacier.zoom
+    );
+
+    if (secondMap) {
+
+        secondMap.setView(
+            glacier.centre,
+            glacier.zoom
+        );
     }
 }
 
+/* =========================
+   Timeline cache (for graph)
+   ========================= */
 
-// Loading state
-function setBusy(busy) {
-    glacierSelect.disabled = busy;
-    yearSlider.disabled = busy;
-}
+const glacierCache = {};
 
+const YEARS = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
 
-// Cache glacier timeline
 async function preloadGlacier(glacierId) {
 
     if (glacierCache[glacierId]) {
@@ -208,15 +274,9 @@ async function preloadGlacier(glacierId) {
 
     glacierCache[glacierId] = {};
 
-    const years = [
-        2017, 2018, 2019, 2020,
-        2021, 2022, 2023, 2024
-    ];
-
-    const requests = years.map(async (year) => {
+    await Promise.all(YEARS.map(async (year) => {
 
         try {
-
             const response = await fetch(
                 `${API}/api/glacier/${year}?glacier=${glacierId}`
             );
@@ -224,143 +284,148 @@ async function preloadGlacier(glacierId) {
             const data = await response.json();
 
             if (!response.ok || data.error) {
-                throw new Error(
-                    data.error || `Could not load ${year}`
-                );
+                throw new Error(data.error || `Could not load ${year}`);
             }
 
             glacierCache[glacierId][year] = data;
 
-            console.log(`${glacierId} ${year} cached`);
-
         } catch (error) {
-
-            console.error(
-                `Could not cache ${glacierId} ${year}:`,
-                error
-            );
+            console.error(`Could not cache ${glacierId} ${year}:`, error);
         }
-
-    });
-
-    await Promise.all(requests);
-
-    console.log(`${glacierId} timeline cached`);
+    }));
 }
 
+/* =========================
+   Get glacier data
+   ========================= */
 
-// Load a year
-async function loadYear(year, isSecondYear = false) {
+async function getGlacierData(year) {
 
-    const glacierId = glacierSelect.value;
-    const selected = glaciers[glacierId];
+    const glacierId = getSelectedGlacier();
 
-    setBusy(true);
+    await preloadGlacier(glacierId);
 
-    map.setView(
-        selected.centre,
-        selected.zoom
-    );
+    const data = glacierCache[glacierId][year];
+
+    if (!data) {
+        throw new Error("Glacier analysis failed.");
+    }
+
+    return data;
+}
+
+/* =========================
+   Load first year
+   ========================= */
+
+async function loadYear(year, updateMap = true) {
 
     status.className = "";
+
     status.textContent =
-        `Loading ${selected.name} for ${year}…`;
+        `Loading ${year} glacier analysis…`;
+
+    viewButton.disabled = true;
 
     try {
 
-        await preloadGlacier(glacierId);
+        const glacierId = getSelectedGlacier();
+
+        const data = await getGlacierData(year);
 
         // Update the 2017–2024 graph
         updateAreaChart(glacierId);
 
-        const data = glacierCache[glacierId][year];
+        /* Remove old first-year overlay */
 
-        if (!data) {
-            throw new Error(
-                `Could not load ${selected.name} for ${year}`
+        if (firstOverlay) {
+
+            map.removeLayer(
+                firstOverlay
             );
+
+            firstOverlay = null;
         }
 
-        // Check glacier
-        if (data.glacierId !== glacierId) {
-            throw new Error(
-                "The backend returned the wrong glacier."
-            );
-        }
 
-        // Validate data
+        /* Add new first-year overlay */
+
         if (
-            !Number.isFinite(data.area) ||
-            data.area < 0 ||
-            typeof data.tileUrl !== "string"
+            data.tileUrl &&
+            Number(data.area) > 0
         ) {
-            throw new Error(
-                "The backend returned incomplete analysis data."
-            );
-        }
 
-        // Backend warning
-        if (data.warning) {
-            warning.textContent = data.warning;
-            warning.hidden = false;
-        }
+            firstOverlay =
+                L.tileLayer(
+                    data.tileUrl,
+                    {
+                        opacity: 0.7,
+                        maxZoom: 19
+                    }
+                );
 
-        // Glacier overlay
-        const newOverlay = L.tileLayer(data.tileUrl, {
-            opacity: 0.75,
-            maxZoom: 19
-        });
-
-
-        if (isSecondYear) {
-
-            // Replace second overlay
-            if (secondOverlay && secondMap) {
-                secondMap.removeLayer(secondOverlay);
-                secondOverlay = null;
-            }
-
-            secondOverlay = newOverlay;
-            secondOverlay.addTo(secondMap);
-
-            // Second-year result
-            secondResultCard.hidden = false;
-
-            secondResultYear.textContent = year;
-            secondArea.textContent =
-                `${data.area.toFixed(2)} km²`;
-            secondReference.textContent =
-                data.referenceYear;
-            secondThreshold.textContent =
-                Number(data.threshold).toFixed(2);
-
-        } else {
-
-            // Replace first overlay
-            if (firstOverlay) {
-                map.removeLayer(firstOverlay);
-            }
-
-            firstOverlay = newOverlay;
             firstOverlay.addTo(map);
-
-            // First-year result
-            firstResultCard.hidden = false;
-
-            firstResultYear.textContent = year;
-            firstArea.textContent =
-                `${data.area.toFixed(2)} km²`;
-            firstReference.textContent =
-                data.referenceYear;
-            firstThreshold.textContent =
-                Number(data.threshold).toFixed(2);
         }
+
+
+        /* Update results */
 
         resultsSection.hidden = false;
 
-        status.textContent =
-            `${selected.name}, ${year}: ` +
-            "analysis and overlay loaded.";
+        firstResultYear.textContent =
+            data.year;
+
+        firstArea.textContent =
+            `${Number(data.area).toFixed(2)} km²`;
+
+        firstReference.textContent =
+            data.referenceYear;
+
+        firstThreshold.textContent =
+            Number(data.threshold).toFixed(2);
+
+        firstMapLabel.textContent =
+            data.year;
+
+
+        /* Warning */
+
+        if (data.warning) {
+
+            warning.hidden = false;
+            warning.textContent =
+                data.warning;
+
+        } else {
+
+            warning.hidden = true;
+            warning.textContent = "";
+        }
+
+
+        /* Status */
+
+        if (Number(data.area) === 0) {
+
+            status.textContent =
+                `No glacier-like area was detected for ${year}.`;
+
+        } else {
+
+            status.textContent =
+                `${data.glacier || "Glacier"} — ${year}: ` +
+                `${Number(data.area).toFixed(2)} km² ` +
+                `glacier-like area detected.`;
+        }
+
+
+        /* Move map if requested */
+
+        if (updateMap) {
+
+            moveToSelectedGlacier();
+        }
+
 
         return data;
 
@@ -369,171 +434,235 @@ async function loadYear(year, isSecondYear = false) {
         console.error(error);
 
         status.className = "error";
+
         status.textContent =
-            `Could not load glacier data: ${error.message}`;
+            `Unable to load ${year}: ${error.message}`;
 
         return null;
 
     } finally {
 
-        setBusy(false);
+        viewButton.disabled = false;
     }
 }
 
 
-// Create second map
+/* =========================
+   Create second map
+   ========================= */
+
 function createSecondMap() {
 
     if (secondMap) {
         return;
     }
 
-    const selected = glaciers[glacierSelect.value];
+    const glacier =
+        glaciers[getSelectedGlacier()];
 
-    secondMap = L.map("secondMap", {
-        zoomControl: false,
-        attributionControl: false
-    }).setView(
-        selected.centre,
-        selected.zoom
-    );
-
-    secondSatellite = L.tileLayer(
-        "https://server.arcgisonline.com/ArcGIS/rest/services/" +
-        "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    secondMap = L.map(
+        "secondMap",
         {
-            attribution: "Tiles &copy; Esri",
-            maxZoom: 19
+            zoomControl: true
         }
-    ).addTo(secondMap);
-}
-
-
-// Close second map
-function closeSecondMap() {
-
-    secondMapContainer.hidden = true;
-
-    if (secondOverlay && secondMap) {
-        secondMap.removeLayer(secondOverlay);
-        secondOverlay = null;
-    }
-
-    secondYearSelect.value = "";
-    secondResultCard.hidden = true;
-
-    // Resize main map
-    setTimeout(() => {
-        map.invalidateSize();
-    }, 0);
-}
-
-
-// Change glacier
-glacierSelect.addEventListener("change", () => {
-
-    clearResult();
-    closeSecondMap();
-
-    const selected = glaciers[glacierSelect.value];
-
-    map.setView(
-        selected.centre,
-        selected.zoom
+    ).setView(
+        glacier.centre,
+        map.getZoom()
     );
 
-    showDemoWarning();
+
+    secondSatelliteLayer =
+        L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/" +
+            "World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            {
+                maxZoom: 19,
+                attribution:
+                    "Tiles © Esri"
+            }
+        );
+
+    secondSatelliteLayer.addTo(
+        secondMap
+    );
+
+
+    /* Keep maps synchronised */
+
+    map.on("move", function () {
+
+        if (!secondMap) {
+            return;
+        }
+
+        const centre =
+            map.getCenter();
+
+        const zoom =
+            map.getZoom();
+
+        if (
+            secondMap.getZoom() !== zoom ||
+            !secondMap
+                .getCenter()
+                .equals(centre)
+        ) {
+
+            secondMap.setView(
+                centre,
+                zoom,
+                {
+                    animate: false
+                }
+            );
+        }
+    });
+
+
+    secondMap.on(
+        "move",
+        function () {
+
+            const centre =
+                secondMap.getCenter();
+
+            const zoom =
+                secondMap.getZoom();
+
+            if (
+                map.getZoom() !== zoom ||
+                !map
+                    .getCenter()
+                    .equals(centre)
+            ) {
+
+                map.setView(
+                    centre,
+                    zoom,
+                    {
+                        animate: false
+                    }
+                );
+            }
+        }
+    );
+}
+
+
+/* =========================
+   Load second year
+   ========================= */
+
+async function loadSecondYear(year) {
+
+    status.className = "";
 
     status.textContent =
-        "Select a year and click View Year.";
-});
+        `Loading second year ${year}…`;
+
+    viewSecondYearButton.disabled =
+        true;
+
+    try {
+
+        const data =
+            await getGlacierData(year);
 
 
-// Change first year
-yearSelect.addEventListener("change", () => {
+        /* Show second map */
 
-    clearResult();
-    showDemoWarning();
+        secondMapContainer.hidden =
+            false;
 
-    status.textContent =
-        "Click View Year to analyse the selected year.";
-});
+        createSecondMap();
 
 
-// Timeline
-yearSlider.value = yearSelect.value;
-sliderYear.textContent = yearSelect.value;
+        /* Leaflet needs resize */
 
-yearSlider.addEventListener("input", () => {
+        setTimeout(() => {
 
-    const year = yearSlider.value;
+            map.invalidateSize();
 
-    sliderYear.textContent = year;
-    yearSelect.value = year;
-});
+            secondMap.invalidateSize();
 
-yearSlider.addEventListener("change", async () => {
-
-    const year = yearSlider.value;
-
-    clearResult();
-    closeSecondMap();
-
-    yearSelect.value = year;
-    firstMapLabel.textContent = year;
-
-    showDemoWarning();
-
-    await loadYear(year, false);
-});
+        }, 100);
 
 
-// View first year
-viewButton.addEventListener("click", async () => {
+        /* Remove previous overlay */
 
-    const year = yearSelect.value;
+        if (secondOverlay) {
 
-    firstMapLabel.textContent = year;
+            secondMap.removeLayer(
+                secondOverlay
+            );
 
-    clearResult();
-    showDemoWarning();
-
-    await loadYear(year, false);
-});
+            secondOverlay = null;
+        }
 
 
-// Second year
-secondYearSelect.addEventListener("change", () => {
+        /* Add second overlay */
 
-    if (!secondYearSelect.value) {
-        closeSecondMap();
-    }
-});
+        if (
+            data.tileUrl &&
+            Number(data.area) > 0
+        ) {
 
-viewSecondYearButton.addEventListener("click", async () => {
+            secondOverlay =
+                L.tileLayer(
+                    data.tileUrl,
+                    {
+                        opacity: 0.7,
+                        maxZoom: 19
+                    }
+                );
 
-    const year = secondYearSelect.value;
+            secondOverlay.addTo(
+                secondMap
+            );
+        }
 
-    if (!year) {
+
+        /* Results */
+
+        resultsSection.hidden = false;
+        secondResultCard.hidden = false;
+
+        secondResultYear.textContent =
+            data.year;
+
+        secondArea.textContent =
+            `${Number(data.area).toFixed(2)} km²`;
+
+        secondReference.textContent =
+            data.referenceYear;
+
+        secondThreshold.textContent =
+            Number(data.threshold).toFixed(2);
+
+        secondMapLabel.textContent =
+            data.year;
+
+
         status.textContent =
-            "Select a second year first.";
-        return;
+            `${data.glacier || "Glacier"} — ${year}: ` +
+            `${Number(data.area).toFixed(2)} km² ` +
+            `glacier-like area detected.`;
+
+    } catch (error) {
+
+        console.error(error);
+
+        status.className = "error";
+
+        status.textContent =
+            `Unable to load ${year}: ${error.message}`;
+
+    } finally {
+
+        viewSecondYearButton.disabled =
+            false;
     }
-
-    secondMapContainer.hidden = false;
-    secondMapLabel.textContent = year;
-
-    createSecondMap();
-
-    setTimeout(() => {
-        map.invalidateSize();
-        secondMap.invalidateSize();
-    }, 0);
-
-    showDemoWarning();
-
-    await loadYear(year, true);
-});
+}
 
 function updateAreaChart(glacierId) {
 
@@ -630,20 +759,366 @@ function updateAreaChart(glacierId) {
     });
 }
 
-// Keep maps aligned
-map.on("move", () => {
+/* =========================
+   Experimental dynamic
+   area analysis
+   ========================= */
 
-    if (!secondMap) {
-        return;
+map.on(
+    "pm:create",
+    async function (event) {
+
+        /*
+         * The polygon/rectangle drawn by the user
+         * is the STUDY AREA.
+         *
+         * The backend automatically creates the
+         * reference and performs the complete
+         * experimental analysis.
+         */
+
+
+        /* Remove previous study area */
+
+        if (
+            selectedStudyArea &&
+            selectedStudyArea !== event.layer
+        ) {
+
+            map.removeLayer(
+                selectedStudyArea
+            );
+        }
+
+        selectedStudyArea =
+            event.layer;
+
+
+        /* Remove previous experimental result */
+
+        if (dynamicOverlay) {
+
+            map.removeLayer(
+                dynamicOverlay
+            );
+
+            dynamicOverlay = null;
+        }
+
+
+        const geojson =
+            selectedStudyArea.toGeoJSON();
+
+        const year =
+            Number(yearSelect.value);
+
+
+        status.className = "";
+
+        status.textContent =
+            `Running experimental dynamic analysis for ${year}…`;
+
+
+        try {
+
+            const response =
+                await fetch(
+                    `${API}/api/automatic-reference-analysis`,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            geometry:
+                                geojson.geometry,
+
+                            year:
+                                year
+                        })
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (
+                !response.ok ||
+                data.error
+            ) {
+
+                throw new Error(
+                    data.error ||
+                    "Dynamic analysis failed."
+                );
+            }
+
+
+            /*
+             * This tile is the FINAL
+             * automatic-reference analysis.
+             *
+             * It is NOT the intermediate
+             * reference candidate layer.
+             */
+
+            if (
+                data.tileUrl &&
+                Number(data.area) > 0
+            ) {
+
+                dynamicOverlay =
+                    L.tileLayer(
+                        data.tileUrl,
+                        {
+                            opacity: 0.75,
+                            maxZoom: 19
+                        }
+                    );
+
+                dynamicOverlay.addTo(
+                    map
+                );
+            }
+
+
+            if (Number(data.area) === 0) {
+
+                status.textContent =
+                    `Experimental analysis — ${year}: ` +
+                    `no glacier-like area was detected ` +
+                    `inside the selected study area.`;
+
+            } else {
+
+                status.textContent =
+                    `Experimental analysis — ${year}: ` +
+                    `${Number(data.area).toFixed(2)} km² ` +
+                    `glacier-like area detected inside ` +
+                    `the selected study area.`;
+            }
+
+
+            console.log(
+                "Experimental dynamic analysis:",
+                data
+            );
+
+        } catch (error) {
+
+            console.error(error);
+
+            status.className =
+                "error";
+
+            status.textContent =
+                `Dynamic analysis failed: ${error.message}`;
+        }
     }
-
-    secondMap.setView(
-        map.getCenter(),
-        map.getZoom(),
-        { animate: false }
-    );
-});
+);
 
 
-// Load initial year
-loadYear(yearSelect.value, false);
+/* =========================
+   Main controls
+   ========================= */
+
+viewButton.addEventListener(
+    "click",
+    function () {
+
+        const year =
+            Number(yearSelect.value);
+
+        yearSlider.value =
+            year;
+
+        sliderYear.textContent =
+            year;
+
+        loadYear(
+            year,
+            false
+        );
+    }
+);
+
+
+viewSecondYearButton.addEventListener(
+    "click",
+    function () {
+
+        loadSecondYear(
+            Number(secondYearSelect.value)
+        );
+    }
+);
+
+
+/* =========================
+   Timeline slider
+   ========================= */
+
+yearSlider.addEventListener(
+    "input",
+    function () {
+
+        sliderYear.textContent =
+            yearSlider.value;
+
+        yearSelect.value =
+            yearSlider.value;
+    }
+);
+
+
+yearSlider.addEventListener(
+    "change",
+    function () {
+
+        // Return to single-map Explorer view
+        secondMapContainer.hidden = true;
+        secondResultCard.hidden = true;
+
+        if (
+            secondOverlay &&
+            secondMap
+        ) {
+            secondMap.removeLayer(
+                secondOverlay
+            );
+
+            secondOverlay = null;
+        }
+
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+
+        loadYear(
+            Number(yearSlider.value),
+            false
+        );
+    }
+);
+
+
+/* =========================
+   Year select
+   ========================= */
+
+yearSelect.addEventListener(
+    "change",
+    function () {
+
+        yearSlider.value =
+            yearSelect.value;
+
+        sliderYear.textContent =
+            yearSelect.value;
+    }
+);
+
+
+/* =========================
+   Glacier selection
+   ========================= */
+
+glacierSelect.addEventListener(
+    "change",
+    async function () {
+
+        /* Remove existing overlays */
+
+        if (firstOverlay) {
+
+            map.removeLayer(
+                firstOverlay
+            );
+
+            firstOverlay = null;
+        }
+
+
+        if (
+            secondOverlay &&
+            secondMap
+        ) {
+
+            secondMap.removeLayer(
+                secondOverlay
+            );
+
+            secondOverlay = null;
+        }
+
+
+        if (dynamicOverlay) {
+
+            map.removeLayer(
+                dynamicOverlay
+            );
+
+            dynamicOverlay = null;
+        }
+
+
+        if (selectedStudyArea) {
+
+            map.removeLayer(
+                selectedStudyArea
+            );
+
+            selectedStudyArea = null;
+        }
+
+
+        /* Hide second comparison */
+
+        secondMapContainer.hidden =
+            true;
+
+        secondResultCard.hidden =
+            true;
+
+
+        /* Move to glacier */
+
+        moveToSelectedGlacier();
+
+
+        /* Reload selected year */
+
+        await loadYear(
+            Number(yearSelect.value),
+            false
+        );
+
+
+        setTimeout(() => {
+
+            map.invalidateSize();
+
+        }, 100);
+    }
+);
+
+
+/* =========================
+   Initial page load
+   ========================= */
+
+sliderYear.textContent =
+    yearSelect.value;
+
+firstMapLabel.textContent =
+    yearSelect.value;
+
+loadYear(
+    Number(yearSelect.value),
+    false
+);
