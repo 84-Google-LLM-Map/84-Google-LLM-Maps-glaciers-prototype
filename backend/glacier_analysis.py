@@ -11,9 +11,9 @@ from glaciers import (
 # EARTH ENGINE
 # ---------------------------------------------------------
 
-PROJECT_ID = "studied-market-509102-a7"
+from ee_auth import PROJECT_ID, init_earth_engine
 
-ee.Initialize(project=PROJECT_ID)
+init_earth_engine()
 
 
 # ---------------------------------------------------------

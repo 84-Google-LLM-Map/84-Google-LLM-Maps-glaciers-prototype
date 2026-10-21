@@ -116,10 +116,14 @@ def calculate_glacier(year):
     """Return the existing API fields plus explicit demo metadata."""
     validate_settings(year)
 
-    # Importing this module does not initialise Earth Engine or start analysis.
+    # Earth Engine is imported and initialised here, on the first
+    # Marmolada request, rather than when this module is imported.
+    # init_earth_engine() does nothing if it has already run.
     import ee
+    from ee_auth import init_earth_engine
 
-    ee.Initialize(project=PROJECT_ID)
+    init_earth_engine()
+
     study_area = ee.Geometry.Point(MARMOLADA_CENTRE).buffer(STUDY_RADIUS_M)
     snow_reference = ee.Geometry.MultiPolygon(SNOW_REFERENCE_COORDINATES)
     if not study_area.contains(snow_reference, 1).getInfo():
@@ -203,4 +207,3 @@ if __name__ == "__main__":
         print(json.dumps(result, indent=2, allow_nan=False))
     except Exception as exc:
         parser.exit(1, f"Analysis not completed: {exc}\n")
-
