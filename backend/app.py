@@ -1,12 +1,17 @@
 from pathlib import Path
+import sys
+
+# Make backend modules available locally and on Vercel.
+BACKEND_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(BACKEND_DIR))
 
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 import ee
 
-from flask_cors import CORS
 from glacier_analysis import calculate_automatic_reference_glacier
-
 from glaciers import GLACIERS
+
 
 app = Flask(__name__)
 CORS(app)
