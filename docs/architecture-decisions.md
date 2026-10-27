@@ -2,9 +2,11 @@
 
 ## 1. Overview
 
-The Rob Roy Glacier Change Explorer is a prototype web application
+The Glacier Change Explorer is a prototype web application
 designed to make changes in detected glacier-like areas easier to
-visualise across multiple years.
+visualise across multiple years. It started with Rob Roy Glacier and now
+supports seven glaciers, configured in `backend/glaciers.py`, as well as
+an experimental page where users can analyse an area they draw on the map.
 
 Current architecture:
 
@@ -30,24 +32,43 @@ detected glacier-like area of approximately 10.71037 km².
 
 Leaflet is used to provide the interactive map interface.
 
-The user can select a year between 2017 and 2024. The frontend requests
-the corresponding analysis from the Flask backend and displays the
-returned Earth Engine map tiles.
+The user can select a glacier and a year between 2017 and 2024. The
+frontend requests the corresponding analysis from the Flask backend and
+displays the returned Earth Engine map tiles.
 
 Leaflet was selected because it provides a lightweight way to display
 interactive geospatial layers without requiring a larger frontend
 framework. It is also an open-source, free tool to use.
+
+The frontend is plain HTML, CSS and JavaScript with no build step. It has
+two pages, switched by URL hash:
+
+- **Home / Explorer** (`#explorer`): glacier and year selection, the
+  timeline slider and a side-by-side comparison of two years.
+- **Experimental Explorer** (`#experimental`): the user draws a study area
+  with **Leaflet-Geoman**, which is analysed with an automatic reference.
+
+Both pages show a 2017–2024 area graph drawn with **Chart.js**. Results are
+cached in the browser per glacier and year. The selected year loads first,
+and the remaining years load in the background to fill in the graph.
 
 ## 4. Backend
 
 Flask provides a small REST API between the frontend and Google Earth
 Engine.
 
-Example:
+Endpoints:
 
-GET /api/glacier/2019
+- `GET /api/glacier/<year>?glacier=<id>`: standard analysis for a
+  configured glacier.
+- `POST /api/automatic-reference-analysis`: experimental analysis of a
+  user-drawn GeoJSON area.
+- `GET /health`: status check for the hosting platform.
 
-The backend performs the Earth Engine analysis and returns:
+Flask also serves the frontend files, so the application runs as a single
+server.
+
+For each analysis, the backend performs the Earth Engine analysis and returns:
 
 - selected year
 - reference year
@@ -66,9 +87,49 @@ A similarity threshold of 0.80 is applied to identify glacier-like
 pixels, and the resulting area is calculated in square kilometres.
 
 Using Earth Engine avoids downloading and locally processing the
-underlying satellite embedding data during the prototype stage.
+underlying satellite embedding data during the prototype stage. For the
+same reason, the application has no database: it stores no user data, and
+all satellite data is retrieved from Earth Engine on demand.
 
-## 6. Prototype Architecture Limitation
+For the experimental analysis, the 2017 reference is selected
+automatically inside the user's drawn area instead of from hand-picked
+polygons. A pixel is selected when it falls in:
+
+- the top 25% of mean Dynamic World snow/ice probability during the local
+  summer
+- the top 30% of SRTM elevation
+- slopes facing away from the sun
+
+The summer dates and slope direction are chosen from the area's
+hemisphere. This logic was developed on Rob Roy and is not reliable for
+every glacier, so it is kept as a separate, clearly labelled experimental
+feature.
+
+## 6. Authentication and Deployment
+
+The backend authenticates with Earth Engine using a Google Cloud
+**service account**, implemented in `backend/ee_auth.py`. Previously,
+each person running the backend had to sign in manually with
+`ee.Authenticate()`. This only worked on that person's computer and could
+not work on a deployed server.
+
+The service-account key is supplied as the `EE_SERVICE_ACCOUNT_KEY`
+environment variable and is never sent to the browser, so website users do
+not need an Earth Engine account or login. Following least privilege, the
+service account has only two roles:
+
+- **Earth Engine Resource Viewer**, to read datasets and run analyses.
+- **Service Usage Consumer**, to use the project's Earth Engine API and
+  quota.
+
+The browser loads overlay tiles directly from Earth Engine using the tile
+URL returned by the backend. These URLs expire after a few hours.
+
+The frontend and backend are deployed together on **Vercel**, with the
+backend running as Python serverless functions and the key stored as a
+Vercel environment variable.
+
+## 7. Prototype Architecture Limitation
 
 The current architecture depends on Google Earth Engine as the
 processing backend.
@@ -77,7 +138,12 @@ This is suitable for demonstrating the prototype, but Earth Engine
 service access and the Satellite Embedding dataset should be considered
 separately when evaluating a future production or commercial system.
 
-## 7. Potential Production Architecture
+Serverless functions also have a maximum run time, which analyses of very
+large glaciers or drawn areas can approach. The public API currently has
+no rate limiting, so heavy use could exhaust the project's Earth Engine
+quota.
+
+## 8. Potential Production Architecture
 
 ### Commercial Considerations
 
