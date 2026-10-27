@@ -5,354 +5,346 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Glacier Explorer</title>
 
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- Leaflet-Geoman (drawing tools) -->
   <link
     rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.0/dist/leaflet-geoman.css"
   >
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      display: flex;
-      height: 100vh;
-    }
-
-    aside {
-      width: 310px;
-      flex-shrink: 0;
-      padding: 24px;
-      overflow-y: auto;
-      background: white;
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    label {
-      display: block;
-      margin-top: 18px;
-    }
-
-    select,
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 8px;
-      font: inherit;
-    }
-
-    button {
-      cursor: pointer;
-    }
-
-    button:disabled {
-      cursor: wait;
-    }
-
-    #map {
-      flex: 1;
-      min-width: 0;
-    }
-
-    #area {
-      font-size: 28px;
-      font-weight: bold;
-    }
-
-    #status {
-      line-height: 1.5;
-      overflow-wrap: anywhere;
-    }
-
-    .error {
-      color: #b42318;
-    }
-
-    #warning {
-      padding: 12px;
-      background: #fff4ce;
-      border-left: 4px solid #b58100;
-      line-height: 1.5;
-    }
-
-    .note {
-      font-size: 13px;
-      line-height: 1.5;
-      color: #555;
-    }
-
-    @media (max-width: 650px) {
-      body {
-        flex-direction: column;
-      }
-
-      aside {
-        width: 100%;
-        max-height: 50vh;
-      }
-
-      #map {
-        min-height: 50vh;
-      }
-    }
-  </style>
+  <!-- Our styling (after library CSS so it can override it) -->
+  <link rel="stylesheet" href="style.css">
 </head>
 
-<body>
-  <aside>
-    <h1>Glacier Explorer</h1>
+<body data-mode="explorer">
 
-    <label for="glacier">Select glacier</label>
-    <select id="glacier">
-      <option value="rob-roy">Rob Roy — New Zealand</option>
-      <option value="marmolada">Marmolada — Italy</option>
-    </select>
+  <!-- =========================
+       Header: page tabs
+       ========================= -->
 
-    <label for="year">Select year</label>
-    <select id="year"></select>
+  <header class="topbar">
+    <nav class="mode-nav" aria-label="Pages">
 
-    <button id="view" type="button">View Year</button>
+      <a class="mode-tab" href="#explorer" data-mode="explorer">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><g fill="currentColor">
+            <rect x="4" y="4" width="7" height="7" rx="1.5"/>
+            <rect x="13" y="4" width="7" height="7" rx="1.5"/>
+            <rect x="4" y="13" width="7" height="7" rx="1.5"/>
+            <rect x="13" y="13" width="7" height="7" rx="1.5"/>
+          </g></svg>
+        </span>
+        Home / Explorer
+      </a>
 
-    <p id="status" role="status" aria-live="polite">
-      Select a year and click View Year.
-    </p>
+      <span class="mode-divider" aria-hidden="true"></span>
 
-    <hr>
+      <a class="mode-tab" href="#experimental" data-mode="experimental">
+        <span class="mode-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3h6"/>
+            <path d="M10 3v6.5L4.6 18.2A1.8 1.8 0 0 0 6.1 21h11.8a1.8 1.8 0 0 0 1.5-2.8L14 9.5V3"/>
+            <path d="M7 15h10"/>
+          </svg>
+        </span>
+        Experimental Explorer
+      </a>
 
-    <h3>Detected glacier-like area</h3>
-    <p id="area">—</p>
+    </nav>
+  </header>
 
-    <p>
-      Reference year:
-      <strong id="reference">—</strong>
-    </p>
 
-    <p>
-      Similarity threshold:
-      <span id="threshold">—</span>
-    </p>
+  <main class="layout">
 
-    <p id="warning" hidden></p>
+    <!-- =========================
+         Sidebar
+         ========================= -->
 
-    <p class="note">
-      The cyan overlay shows pixels matching the reference.
-      The satellite basemap does not change with the selected year.
-      Results are not measurements of ice-volume loss.
-    </p>
-  </aside>
+    <aside>
 
-  <div id="map" aria-label="Glacier map"></div>
+      <h1>Glacier Explorer</h1>
+      <p id="glacierSubtitle" class="glacier-subtitle">Rob Roy Glacier</p>
 
+      <label for="glacier">Select glacier</label>
+      <select id="glacier">
+        <option value="rob-roy">Rob Roy Glacier</option>
+        <option value="marmolada">Marmolada</option>
+        <option value="aletsch">Aletsch Glacier</option>
+        <option value="rhone">Rhône Glacier</option>
+        <option value="mendenhall">Mendenhall Glacier</option>
+        <option value="franz-josef">Franz Josef Glacier</option>
+        <option value="gangotri">Gangotri Glacier</option>
+      </select>
+
+
+      <!-- Timeline -->
+      <div class="timeline-section">
+
+        <div class="timeline-header">
+          <strong>Year Slider</strong>
+
+          <div class="timeline-controls">
+            <label class="slider-toggle" for="sliderEnabled">
+              <input type="checkbox" id="sliderEnabled" checked>
+              Enable
+            </label>
+            <span id="sliderYear">2019</span>
+          </div>
+        </div>
+
+        <input
+          type="range"
+          id="yearSlider"
+          min="2017"
+          max="2024"
+          step="1"
+          value="2019"
+          aria-label="Year"
+        >
+
+        <div class="timeline-years">
+          <span>2017</span>
+          <span>2024</span>
+        </div>
+
+      </div>
+
+
+      <!-- Select year -->
+      <div class="comparison-section">
+
+        <h3 class="comparison-title">Select Year</h3>
+
+        <p class="comparison-description">
+          Choose a year to visualise glacier-like area.
+        </p>
+
+        <label for="year">Year</label>
+        <select id="year"></select>
+
+        <button id="view" type="button">View Year</button>
+
+      </div>
+
+
+      <!-- Optional second year -->
+      <div class="second-year-section">
+
+        <div class="section-heading">
+          <h3>Second Year <span>(Optional)</span></h3>
+          <p>Select a second year to view it side by side.</p>
+        </div>
+
+        <label for="secondYear">Second Year</label>
+        <select id="secondYear"></select>
+
+        <button id="viewSecondYear" type="button">View Second Year</button>
+
+      </div>
+
+
+      <!-- Experimental analysis (Experimental Explorer page only) -->
+      <div class="experimental-section experimental-only">
+
+        <div class="experimental-heading">
+          <h3>Dynamic Analysis</h3>
+          <span class="experimental-badge">Experimental</span>
+        </div>
+
+        <p class="experimental-description">
+          Draw a rectangle or shape on the map using the tools on the right.
+          The reference is built automatically from the area you draw.
+        </p>
+
+        <form id="coordSearch" class="coord-search">
+          <label for="coordInput" class="visually-hidden">
+            Coordinates (latitude, longitude)
+          </label>
+          <input
+            id="coordInput"
+            type="text"
+            inputmode="decimal"
+            placeholder="Latitude, longitude"
+            autocomplete="off"
+          >
+          <button type="submit">Search</button>
+        </form>
+
+        <p id="experimentalResult" class="experimental-result" hidden></p>
+
+        <p class="experimental-warning">
+          Experimental: results use an automatically selected reference and
+          have not been scientifically validated.
+        </p>
+
+      </div>
+
+
+      <button id="analyse" type="button" class="analyse-button">
+        Analyse Glacier
+      </button>
+
+      <p id="status" role="status" aria-live="polite"></p>
+      <p id="warning" hidden></p>
+
+
+      <!-- =========================
+           Results (both pages)
+           ========================= -->
+
+      <section id="resultsSection" class="results-section" aria-label="Results">
+
+        <h3>Results</h3>
+
+        <p class="result-glacier">
+          Glacier: <strong id="resultGlacierName">Rob Roy Glacier</strong>
+        </p>
+
+        <div class="comparison-results">
+
+          <div class="result-card" id="firstResultCard">
+            <span class="result-label">First Year</span>
+            <h3 id="firstResultYear">—</h3>
+            <p class="result-area" id="firstArea">—</p>
+            <p>Reference year: <strong id="firstReference">—</strong></p>
+            <p>Similarity threshold: <span id="firstThreshold">—</span></p>
+          </div>
+
+          <div class="result-card" id="secondResultCard">
+            <span class="result-label">Second Year</span>
+            <h3 id="secondResultYear">—</h3>
+            <p class="result-area" id="secondArea">—</p>
+            <p>Reference year: <strong id="secondReference">—</strong></p>
+            <p>Similarity threshold: <span id="secondThreshold">—</span></p>
+          </div>
+
+        </div>
+
+        <div class="area-chart-section">
+
+          <div class="section-heading">
+            <h3>Glacier-like area, 2017–2024</h3>
+            <p>Red is the first year, black the second.</p>
+          </div>
+
+          <div class="area-chart-wrapper">
+            <canvas
+              id="areaChart"
+              role="img"
+              aria-label="Bar chart of glacier-like area for each year from 2017 to 2024"
+            ></canvas>
+          </div>
+
+        </div>
+
+      </section>
+
+      <p class="note">
+        The red overlay shows pixels matching the 2017 reference.
+        The satellite basemap does not change with the selected year.
+        Results are not measurements of ice-volume loss.
+      </p>
+
+      <button id="a11yButton" type="button" class="a11y-button">
+        Accessibility Settings
+      </button>
+
+    </aside>
+
+
+    <!-- =========================
+         Maps
+         ========================= -->
+
+    <div id="map-container">
+
+      <div id="first-map-container">
+
+        <div id="first-map-label">2019</div>
+        <div id="map" aria-label="Glacier map"></div>
+
+        <div class="map-legend" aria-label="Map legend">
+          <strong class="legend-title">Legend</strong>
+
+          <ul class="legend-list">
+            <li>
+              <span class="legend-swatch" aria-hidden="true"></span>
+              Glacier-like area
+            </li>
+            <li>
+              <span class="legend-icon" data-icon="satellite" aria-hidden="true"></span>
+              Satellite imagery
+            </li>
+            <li class="experimental-only">
+              <span class="legend-swatch legend-swatch--experimental" aria-hidden="true"></span>
+              Experimental result
+            </li>
+            <li class="experimental-only">
+              <span class="legend-icon" data-icon="hand" aria-hidden="true"></span>
+              Stop drawing / move map
+            </li>
+            <li class="experimental-only">
+              <span class="legend-icon" data-icon="line" aria-hidden="true"></span>
+              Draw line
+            </li>
+            <li class="experimental-only">
+              <span class="legend-icon" data-icon="rectangle" aria-hidden="true"></span>
+              Draw rectangle
+            </li>
+            <li class="experimental-only">
+              <span class="legend-icon" data-icon="polygon" aria-hidden="true"></span>
+              Draw shape
+            </li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div id="second-map-container" hidden>
+        <div id="second-map-label">Second Year</div>
+        <div id="secondMap" aria-label="Second year map"></div>
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <!-- =========================
+       Accessibility settings
+       ========================= -->
+
+  <dialog id="a11yDialog" aria-labelledby="a11yTitle">
+    <form method="dialog">
+      <h3 id="a11yTitle">Accessibility Settings</h3>
+
+      <label class="check-row">
+        <input type="checkbox" data-a11y="largeText">
+        Larger text
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" data-a11y="highContrast">
+        High contrast
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" data-a11y="reduceMotion">
+        Reduce motion
+      </label>
+
+      <button type="submit">Done</button>
+    </form>
+  </dialog>
+
+
+  <!-- Libraries, then our JavaScript last -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <script>
-    const API = "http://127.0.0.1:5000";
-
-    // Leaflet coordinates: latitude, longitude.
-    const glaciers = {
-      "rob-roy": {
-        name: "Rob Roy",
-        centre: [-44.455, 168.741],
-        zoom: 13
-      },
-      "marmolada": {
-        name: "Marmolada",
-        centre: [46.43522, 11.857975],
-        zoom: 13
-      }
-    };
-
-    const glacierSelect = document.getElementById("glacier");
-    const yearSelect = document.getElementById("year");
-    const viewButton = document.getElementById("view");
-    const status = document.getElementById("status");
-    const area = document.getElementById("area");
-    const reference = document.getElementById("reference");
-    const threshold = document.getElementById("threshold");
-    const warning = document.getElementById("warning");
-
-    for (let year = 2017; year <= 2024; year++) {
-      yearSelect.add(new Option(year, year));
-    }
-
-    yearSelect.value = "2019";
-
-    const map = L.map("map").setView(
-      glaciers["rob-roy"].centre,
-      glaciers["rob-roy"].zoom
-    );
-
-    const satellite = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/" +
-      "World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        attribution: "Tiles &copy; Esri",
-        maxZoom: 19
-      }
-    ).addTo(map);
-
-    const streets = L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 19
-      }
-    );
-
-    L.control.layers({
-      Satellite: satellite,
-      Streets: streets
-    }).addTo(map);
-
-    let overlay = null;
-
-    function clearResult() {
-      if (overlay) {
-        map.removeLayer(overlay);
-        overlay = null;
-      }
-
-      area.textContent = "—";
-      reference.textContent = "—";
-      threshold.textContent = "—";
-      warning.hidden = true;
-      warning.textContent = "";
-      status.className = "";
-    }
-
-    function showDemoWarning() {
-      if (glacierSelect.value === "marmolada") {
-        warning.textContent =
-          "Demo only: Marmolada currently uses an artificial, " +
-          "unverified reference polygon. Results require Applied " +
-          "Science review and are not validated glacier measurements.";
-
-        warning.hidden = false;
-      }
-    }
-
-    function setBusy(busy) {
-      viewButton.disabled = busy;
-      glacierSelect.disabled = busy;
-      yearSelect.disabled = busy;
-      viewButton.textContent = busy ? "Analysing…" : "View Year";
-    }
-
-    async function loadGlacier() {
-      const glacierId = glacierSelect.value;
-      const year = yearSelect.value;
-      const selected = glaciers[glacierId];
-
-      clearResult();
-      showDemoWarning();
-      setBusy(true);
-
-      map.setView(selected.centre, selected.zoom);
-      status.textContent =
-        `Analysing ${selected.name} for ${year}…`;
-
-      try {
-        const response = await fetch(
-          `${API}/api/glacier/${year}?glacier=${glacierId}`
-        );
-
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          throw new Error(
-            data.error || `Request failed: ${response.status}`
-          );
-        }
-
-        // Detect an old backend that ignores glacier selection.
-        if (data.glacierId !== glacierId) {
-          throw new Error(
-            "The backend returned the wrong glacier or is running " +
-            "the old app.py. Restart the updated backend."
-          );
-        }
-
-        if (
-          !Number.isFinite(data.area) ||
-          data.area < 0 ||
-          typeof data.tileUrl !== "string"
-        ) {
-          throw new Error(
-            "The backend returned incomplete analysis data."
-          );
-        }
-
-        area.textContent = `${data.area.toFixed(2)} km\u00B2`;
-        reference.textContent = data.referenceYear;
-        threshold.textContent = Number(data.threshold).toFixed(2);
-
-        if (data.warning) {
-          warning.textContent = data.warning;
-          warning.hidden = false;
-        }
-
-        const newOverlay = L.tileLayer(data.tileUrl, {
-          opacity: 0.75,
-          maxZoom: 19
-        });
-
-        overlay = newOverlay;
-        let tileFailed = false;
-
-        newOverlay.on("tileerror", () => {
-          if (overlay !== newOverlay) return;
-
-          tileFailed = true;
-          status.className = "error";
-          status.textContent =
-            "Analysis returned data, but some overlay tiles failed " +
-            "to load. Click View Year to retry.";
-        });
-
-        newOverlay.on("load", () => {
-          if (overlay !== newOverlay || tileFailed) return;
-
-          status.textContent =
-            `${selected.name}, ${year}: ` +
-            (data.area === 0
-              ? "No matching pixels detected."
-              : "Analysis and overlay loaded.");
-        });
-
-        status.textContent =
-          `${selected.name}, ${year}: analysis returned. ` +
-          "Loading overlay…";
-
-        newOverlay.addTo(map);
-
-      } catch (error) {
-        console.error(error);
-        status.className = "error";
-        status.textContent =
-          `Could not load glacier data: ${error.message}`;
-
-      } finally {
-        setBusy(false);
-      }
-    }
-
-    viewButton.addEventListener("click", loadGlacier);
-
-    // Changing glacier automatically runs the selected year.
-    glacierSelect.addEventListener("change", loadGlacier);
-
-    yearSelect.addEventListener("change", () => {
-      clearResult();
-      showDemoWarning();
-      status.textContent =
-        "Click View Year to analyse the selected year.";
-    });
-  </script>
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.18.0/dist/leaflet-geoman.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
