@@ -155,7 +155,7 @@ studied-market-509102-a7
 
 **Option A: service-account key (recommended, same as deployment)**
 
-1. Obtain the service-account JSON key from the team's project administrator through a secure channel.
+1. Obtain the service-account JSON key from the team's project administrator through a secure channel. If the JSON key cannot be obtained, another JSON key can be generated from the Google project account.
 2. Save it in the `secrets/` folder in the project root. This folder is git-ignored.
 3. Load it into an environment variable before starting the backend:
 
